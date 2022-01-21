@@ -3,7 +3,7 @@ instances {
   id: "Pig"
   prototype: "/Prefabs/Pig.go"
   position {
-    x: 192.0
+    x: 176.0
     y: 318.0
     z: 0.2
   }
@@ -24,7 +24,7 @@ instances {
   prototype: "/Prefabs/BackgroundDollars.go"
   children: "Circle"
   position {
-    x: 192.0
+    x: 164.0
     y: 338.0
     z: 0.0
   }
@@ -44,7 +44,7 @@ instances {
   id: "Circle"
   prototype: "/Prefabs/Circle.go"
   position {
-    x: 0.0
+    x: 12.0
     y: -21.0
     z: 0.1
   }
@@ -64,7 +64,7 @@ instances {
   id: "ButtonBar"
   prototype: "/Prefabs/Buttons/ButtonBar.go"
   position {
-    x: 488.0
+    x: 463.0
     y: 534.0
     z: 0.0
   }
@@ -84,7 +84,7 @@ instances {
   id: "ButtonFactory"
   prototype: "/Prefabs/Buttons/ButtonFactory.go"
   position {
-    x: 666.0
+    x: 641.0
     y: 534.0
     z: 0.0
   }
@@ -104,7 +104,7 @@ instances {
   id: "ButtonHospital"
   prototype: "/Prefabs/Buttons/ButtonHospital.go"
   position {
-    x: 847.0
+    x: 822.0
     y: 534.0
     z: 0.0
   }
@@ -214,7 +214,7 @@ embedded_instances {
   "}\n"
   ""
   position {
-    x: 198.0
+    x: 182.0
     y: 604.0
     z: 0.3
   }

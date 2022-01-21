@@ -1,8 +1,8 @@
 embedded_components {
   id: "sprite"
   type: "sprite"
-  data: "tile_set: \"/Atlas/FactoryAtlas.atlas\"\n"
-  "default_animation: \"FactoryAnimation\"\n"
+  data: "tile_set: \"/Atlas/Buildings.atlas\"\n"
+  "default_animation: \"FactoryAnimations\"\n"
   "material: \"/builtins/materials/sprite.material\"\n"
   "blend_mode: BLEND_MODE_ALPHA\n"
   ""
