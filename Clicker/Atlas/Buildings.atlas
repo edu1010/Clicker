@@ -1,5 +1,13 @@
+images {
+  image: "/Sprites/Buildings/Bar.png"
+  sprite_trim_mode: SPRITE_TRIM_MODE_OFF
+}
+images {
+  image: "/Sprites/Buildings/Hospital.png"
+  sprite_trim_mode: SPRITE_TRIM_MODE_OFF
+}
 animations {
-  id: "FactoryAnimation"
+  id: "FactoryAnimations"
   images {
     image: "/Sprites/Buildings/Factory1.png"
     sprite_trim_mode: SPRITE_TRIM_MODE_OFF
@@ -9,7 +17,7 @@ animations {
     sprite_trim_mode: SPRITE_TRIM_MODE_OFF
   }
   playback: PLAYBACK_LOOP_FORWARD
-  fps: 2
+  fps: 3
   flip_horizontal: 0
   flip_vertical: 0
 }

@@ -3,8 +3,8 @@ instances {
   id: "Pig"
   prototype: "/Prefabs/Pig.go"
   position {
-    x: 189.0
-    y: 195.0
+    x: 192.0
+    y: 318.0
     z: 0.2
   }
   rotation {
@@ -45,7 +45,7 @@ instances {
   prototype: "/Prefabs/Circle.go"
   position {
     x: 0.0
-    y: -144.0
+    y: -21.0
     z: 0.1
   }
   rotation {
@@ -58,6 +58,66 @@ instances {
     x: 0.7
     y: 0.7
     z: 0.7
+  }
+}
+instances {
+  id: "ButtonBar"
+  prototype: "/Prefabs/Buttons/ButtonBar.go"
+  position {
+    x: 488.0
+    y: 534.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.5
+    y: 0.5
+    z: 1.0
+  }
+}
+instances {
+  id: "ButtonFactory"
+  prototype: "/Prefabs/Buttons/ButtonFactory.go"
+  position {
+    x: 666.0
+    y: 534.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.5
+    y: 0.5
+    z: 0.5
+  }
+}
+instances {
+  id: "ButtonHospital"
+  prototype: "/Prefabs/Buttons/ButtonHospital.go"
+  position {
+    x: 847.0
+    y: 534.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.5
+    y: 0.5
+    z: 0.5
   }
 }
 scale_along_z: 0
@@ -96,10 +156,66 @@ embedded_instances {
   "    w: 1.0\n"
   "  }\n"
   "}\n"
+  "embedded_components {\n"
+  "  id: \"textClick\"\n"
+  "  type: \"label\"\n"
+  "  data: \"size {\\n"
+  "  x: 128.0\\n"
+  "  y: 32.0\\n"
+  "  z: 0.0\\n"
+  "  w: 0.0\\n"
+  "}\\n"
+  "scale {\\n"
+  "  x: 2.0\\n"
+  "  y: 2.0\\n"
+  "  z: 2.0\\n"
+  "  w: 0.0\\n"
+  "}\\n"
+  "color {\\n"
+  "  x: 1.0\\n"
+  "  y: 1.0\\n"
+  "  z: 1.0\\n"
+  "  w: 1.0\\n"
+  "}\\n"
+  "outline {\\n"
+  "  x: 0.0\\n"
+  "  y: 0.0\\n"
+  "  z: 0.0\\n"
+  "  w: 1.0\\n"
+  "}\\n"
+  "shadow {\\n"
+  "  x: 0.0\\n"
+  "  y: 0.0\\n"
+  "  z: 0.0\\n"
+  "  w: 1.0\\n"
+  "}\\n"
+  "leading: 1.0\\n"
+  "tracking: 0.05\\n"
+  "pivot: PIVOT_CENTER\\n"
+  "blend_mode: BLEND_MODE_ALPHA\\n"
+  "line_break: false\\n"
+  "text: \\\"0 Coins\\\\n"
+  "\\\"\\n"
+  "  \\\"\\\"\\n"
+  "font: \\\"/builtins/fonts/system_font.font\\\"\\n"
+  "material: \\\"/builtins/fonts/label.material\\\"\\n"
+  "\"\n"
+  "  position {\n"
+  "    x: -9.0\n"
+  "    y: -84.0\n"
+  "    z: 0.0\n"
+  "  }\n"
+  "  rotation {\n"
+  "    x: 0.0\n"
+  "    y: 0.0\n"
+  "    z: 0.0\n"
+  "    w: 1.0\n"
+  "  }\n"
+  "}\n"
   ""
   position {
-    x: 0.0
-    y: 0.0
+    x: 198.0
+    y: 604.0
     z: 0.3
   }
   rotation {

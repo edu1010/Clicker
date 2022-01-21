@@ -1,7 +1,7 @@
 embedded_components {
   id: "sprite"
   type: "sprite"
-  data: "tile_set: \"/Atlas/CircleAtlas.atlas\"\n"
+  data: "tile_set: \"/Atlas/BackgroundDollarsAtlas.atlas\"\n"
   "default_animation: \"Circle\"\n"
   "material: \"/builtins/materials/sprite.material\"\n"
   "blend_mode: BLEND_MODE_ALPHA\n"
