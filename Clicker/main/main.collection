@@ -1,4 +1,65 @@
 name: "main"
+instances {
+  id: "Pig"
+  prototype: "/Prefabs/Pig.go"
+  position {
+    x: 189.0
+    y: 195.0
+    z: 0.2
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.75
+    y: 0.75
+    z: 0.75
+  }
+}
+instances {
+  id: "BackgroundDollars"
+  prototype: "/Prefabs/BackgroundDollars.go"
+  children: "Circle"
+  position {
+    x: 192.0
+    y: 338.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 1.0
+    y: 1.0
+    z: 1.0
+  }
+}
+instances {
+  id: "Circle"
+  prototype: "/Prefabs/Circle.go"
+  position {
+    x: 0.0
+    y: -144.0
+    z: 0.1
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.7
+    y: 0.7
+    z: 0.7
+  }
+}
 scale_along_z: 0
 embedded_instances {
   id: "Clicker"
@@ -20,7 +81,7 @@ embedded_instances {
   "embedded_components {\n"
   "  id: \"factory\"\n"
   "  type: \"factory\"\n"
-  "  data: \"prototype: \\\"/Prefabs/Cake.go\\\"\\n"
+  "  data: \"prototype: \\\"/Prefabs/Coin.go\\\"\\n"
   "load_dynamically: false\\n"
   "\"\n"
   "  position {\n"
@@ -39,7 +100,7 @@ embedded_instances {
   position {
     x: 0.0
     y: 0.0
-    z: 0.0
+    z: 0.3
   }
   rotation {
     x: 0.0

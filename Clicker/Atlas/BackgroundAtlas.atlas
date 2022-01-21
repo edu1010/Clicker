@@ -1,5 +1,5 @@
 images {
-  image: "/Sprites/cake.png"
+  image: "/Sprites/Backgrounds/background1.png"
   sprite_trim_mode: SPRITE_TRIM_MODE_OFF
 }
 margin: 0
