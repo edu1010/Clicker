@@ -1,0 +1,21 @@
+
+function init(self)
+	-- Add initialization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+	
+	self.numberOfDollarsT = 0
+end
+
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Learn more: https://defold.com/manuals/message-passing/
+	-- Remove this function if not needed
+	if message_id == hash("setText") then
+		local str ="Dollars: ".. numberOfDollars
+		-- local nodText = gui.get_node("NodeText")
+		gui.set_text(gui.get_node("NodeText"),str)
+		print (str)
+	end
+end

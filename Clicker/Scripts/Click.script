@@ -1,61 +1,42 @@
-NumberOfClicks = 0;
-
+numberOfDollars = 0
 function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
+	self.numberOfClicks = 0
+	numberOfDollars = 0
 	msg.post(".", "acquire_input_focus")
-	NumberOfClicks = 0
-end
 
-function final(self)
-	-- Add finalization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
-end
-
-function update(self, dt)
-	-- Add update code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
+	
 end
 
 function on_message(self, message_id, message, sender)
 	-- Add message-handling code here
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
+
+
+	if message_id == hash("increase_dolars") then
+		numberOfDollars = numberOfDollars+1
+		msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+	end
 end
 
 function on_input(self, action_id, action)
-	-- Add input-handling code here. The game object this script is attached to
-	-- must have acquired input focus:
-	--
-	--    msg.post(".", "acquire_input_focus")
-	--
-	-- All mapped input bindings will be received. Mouse and touch input will
-	-- be received regardless of where on the screen it happened.
-	-- Learn more: https://defold.com/manuals/input/
-	-- Remove this function if not needed
 	if action_id == hash("touch") then
 		if action.pressed then
-			NumberOfClicks = NumberOfClicks + 1;
-			print(NumberOfClicks)
-			
-			local pos =  vmath.vector3(450,450,0.5)
-			local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.25)
-			
-			
-			
+			self.numberOfClicks = self.numberOfClicks + 1;
+			msg.post("/Clicker#Click", "increase_dolars")
+			print(self.numberOfClicks)
+			if self.numberOfClicks >= 10 then
+				local pos =  vmath.vector3(450,450,0.5)
+				local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.25)
+				self.numberOfClicks = 0
+			end
 			-- left mouse button pressed
 			
 		elseif action.released then
 			-- left mouse button released
 		end
 	end
-end
-
-function on_reload(self)
-	-- Add reload-handling code here
-	-- Learn more: https://defold.com/manuals/hot-reload/
-	-- Remove this function if not needed
 end
