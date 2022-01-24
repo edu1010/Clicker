@@ -1,7 +1,7 @@
 name: "main"
 instances {
   id: "Pig"
-  prototype: "/Prefabs/Pig.go"
+  prototype: "/Prefabs/Printer.go"
   position {
     x: 176.0
     y: 318.0
@@ -17,47 +17,6 @@ instances {
     x: 0.75
     y: 0.75
     z: 0.75
-  }
-}
-instances {
-  id: "BackgroundDollars"
-  prototype: "/Prefabs/BackgroundDollars.go"
-  children: "Circle"
-  position {
-    x: 164.0
-    y: 338.0
-    z: 0.0
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-  }
-}
-instances {
-  id: "Circle"
-  prototype: "/Prefabs/Circle.go"
-  position {
-    x: 12.0
-    y: -21.0
-    z: 0.1
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.7
-    y: 0.7
-    z: 0.7
   }
 }
 instances {
@@ -194,7 +153,7 @@ embedded_instances {
   "pivot: PIVOT_CENTER\\n"
   "blend_mode: BLEND_MODE_ALPHA\\n"
   "line_break: false\\n"
-  "text: \\\"0 Coins\\\\n"
+  "text: \\\"0 Dollars\\\\n"
   "\\\"\\n"
   "  \\\"\\\"\\n"
   "font: \\\"/builtins/fonts/system_font.font\\\"\\n"
