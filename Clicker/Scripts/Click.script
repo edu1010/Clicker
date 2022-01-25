@@ -1,13 +1,13 @@
 numberOfDollars = 0
+numberOfCoins = 0
 function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
 	self.numberOfClicks = 0
 	numberOfDollars = 0
+	numberOfCoins = 0
 	msg.post(".", "acquire_input_focus")
-
-	
 end
 
 function on_message(self, message_id, message, sender)
@@ -15,24 +15,34 @@ function on_message(self, message_id, message, sender)
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 
-
+	if message_id == hash("NewCoin") then
+		numberOfCoins = numberOfCoins + 1
+		local pos =  vmath.vector3(10,170,0.5)
+		for i=1, numberOfCoins do
+			pos = pos + vmath.vector3(35, 0, 0)
+		end
+		
+		local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.1)
+		msg.post("/Clicker#TextDollarsGui", "ReloadPie")
+		self.numberOfClicks = 0	
+	end
+		
 	if message_id == hash("increase_dolars") then
 		numberOfDollars = numberOfDollars+1
+		self.numberOfClicks = self.numberOfClicks + 1;
 		msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+
+		if self.numberOfClicks >= 10 then
+			msg.post("/Clicker#Click", "NewCoin")
+		end	
 	end
 end
 
 function on_input(self, action_id, action)
 	if action_id == hash("touch") then
 		if action.pressed then
-			self.numberOfClicks = self.numberOfClicks + 1;
+			-- aqui
 			msg.post("/Clicker#Click", "increase_dolars")
-			print(self.numberOfClicks)
-			if self.numberOfClicks >= 10 then
-				local pos =  vmath.vector3(450,450,0.5)
-				local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.25)
-				self.numberOfClicks = 0
-			end
 			-- left mouse button pressed
 			
 		elseif action.released then

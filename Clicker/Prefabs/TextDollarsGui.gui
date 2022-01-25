@@ -11,8 +11,8 @@ background_color {
 }
 nodes {
   position {
-    x: 201.0
-    y: 99.0
+    x: 184.0
+    y: 560.0
     z: 0.0
     w: 1.0
   }
@@ -30,7 +30,7 @@ nodes {
   }
   size {
     x: 200.0
-    y: 100.0
+    y: 50.0
     z: 0.0
     w: 1.0
   }
@@ -42,8 +42,7 @@ nodes {
   }
   type: TYPE_TEXT
   blend_mode: BLEND_MODE_ALPHA
-  text: "hi\n"
-  ""
+  text: "Dollars: 0"
   font: "system_font"
   id: "NodeText"
   xanchor: XANCHOR_NONE
@@ -56,9 +55,9 @@ nodes {
     w: 1.0
   }
   shadow {
-    x: 1.0
-    y: 1.0
-    z: 1.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
     w: 1.0
   }
   adjust_mode: ADJUST_MODE_FIT
@@ -67,15 +66,15 @@ nodes {
   inherit_alpha: true
   alpha: 1.0
   outline_alpha: 1.0
-  shadow_alpha: 1.0
+  shadow_alpha: 0.0
   template_node_child: false
   text_leading: 1.0
   text_tracking: 0.0
 }
 nodes {
   position {
-    x: 0.0
-    y: 0.0
+    x: 51.0
+    y: 584.0
     z: 0.0
     w: 1.0
   }
@@ -92,8 +91,8 @@ nodes {
     w: 1.0
   }
   size {
-    x: 100.0
-    y: 100.0
+    x: 20.0
+    y: 20.0
     z: 0.0
     w: 1.0
   }
@@ -106,7 +105,7 @@ nodes {
   type: TYPE_PIE
   blend_mode: BLEND_MODE_ALPHA
   texture: ""
-  id: "pie"
+  id: "PieClicks"
   xanchor: XANCHOR_NONE
   yanchor: YANCHOR_NONE
   pivot: PIVOT_CENTER
@@ -114,9 +113,9 @@ nodes {
   layer: ""
   inherit_alpha: true
   outerBounds: PIEBOUNDS_ELLIPSE
-  innerRadius: 100.0
+  innerRadius: 20.0
   perimeterVertices: 64
-  pieFillAngle: 300.0
+  pieFillAngle: 0.0
   clipping_mode: CLIPPING_MODE_NONE
   clipping_visible: true
   clipping_inverted: false

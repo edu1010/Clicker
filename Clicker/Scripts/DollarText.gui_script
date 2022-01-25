@@ -14,8 +14,17 @@ function on_message(self, message_id, message, sender)
 	-- Remove this function if not needed
 	if message_id == hash("setText") then
 		local str ="Dollars: ".. numberOfDollars
-		-- local nodText = gui.get_node("NodeText")
 		gui.set_text(gui.get_node("NodeText"),str)
+
+		if(gui.get_fill_angle(gui.get_node("PieClicks")) == 360) then
+			gui.set_fill_angle(gui.get_node("PieClicks"), 0)
+		else
+			gui.set_fill_angle(gui.get_node("PieClicks"), gui.get_fill_angle(gui.get_node("PieClicks")) + 36)
+		end
 		print (str)
+	end
+
+	if message_id == hash("ReloadPie") then
+		gui.set_fill_angle(gui.get_node("PieClicks"), 0)
 	end
 end
