@@ -2,7 +2,7 @@ embedded_components {
   id: "sprite"
   type: "sprite"
   data: "tile_set: \"/Atlas/Buildings.atlas\"\n"
-  "default_animation: \"Factory1\"\n"
+  "default_animation: \"Street\"\n"
   "material: \"/builtins/materials/sprite.material\"\n"
   "blend_mode: BLEND_MODE_ALPHA\n"
   ""

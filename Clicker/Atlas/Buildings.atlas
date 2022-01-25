@@ -6,20 +6,21 @@ images {
   image: "/Sprites/Buildings/Hospital.png"
   sprite_trim_mode: SPRITE_TRIM_MODE_OFF
 }
-animations {
-  id: "FactoryAnimations"
-  images {
-    image: "/Sprites/Buildings/Factory1.png"
-    sprite_trim_mode: SPRITE_TRIM_MODE_OFF
-  }
-  images {
-    image: "/Sprites/Buildings/Factory2.png"
-    sprite_trim_mode: SPRITE_TRIM_MODE_OFF
-  }
-  playback: PLAYBACK_LOOP_FORWARD
-  fps: 3
-  flip_horizontal: 0
-  flip_vertical: 0
+images {
+  image: "/Sprites/Streets/Street.png"
+  sprite_trim_mode: SPRITE_TRIM_MODE_OFF
+}
+images {
+  image: "/Sprites/Buildings/Factory1.png"
+  sprite_trim_mode: SPRITE_TRIM_MODE_OFF
+}
+images {
+  image: "/Sprites/Fondo.png"
+  sprite_trim_mode: SPRITE_TRIM_MODE_OFF
+}
+images {
+  image: "/Sprites/Reborde.png"
+  sprite_trim_mode: SPRITE_TRIM_MODE_OFF
 }
 margin: 0
 extrude_borders: 2

@@ -11,8 +11,8 @@ background_color {
 }
 nodes {
   position {
-    x: 184.0
-    y: 560.0
+    x: 175.0
+    y: 551.0
     z: 0.0
     w: 1.0
   }
@@ -42,7 +42,7 @@ nodes {
   }
   type: TYPE_TEXT
   blend_mode: BLEND_MODE_ALPHA
-  text: "Dollars: 0"
+  text: "0 Dollars"
   font: "system_font"
   id: "NodeText"
   xanchor: XANCHOR_NONE

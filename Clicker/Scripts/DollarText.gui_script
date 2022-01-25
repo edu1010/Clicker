@@ -13,7 +13,7 @@ function on_message(self, message_id, message, sender)
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 	if message_id == hash("setText") then
-		local str ="Dollars: ".. numberOfDollars
+		local str = numberOfDollars.. " Dollars"
 		gui.set_text(gui.get_node("NodeText"),str)
 
 		if(gui.get_fill_angle(gui.get_node("PieClicks")) == 360) then
