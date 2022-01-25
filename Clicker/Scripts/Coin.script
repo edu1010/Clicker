@@ -20,6 +20,7 @@ function update(self, dt)
 	self.timer = self.timer+ dt
 	if self.timer > 3 then
 		self.timer = 0
+		sound.play("#CoinSound")
 		msg.post("/Clicker#Click", "increase_dolars")
 	end
 	

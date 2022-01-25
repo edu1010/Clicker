@@ -23,6 +23,7 @@ function on_message(self, message_id, message, sender)
 		end
 		
 		local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.1)
+		sound.play("#NewCoin")
 		msg.post("/Clicker#TextDollarsGui", "ReloadPie")
 		self.numberOfClicks = 0	
 	end
@@ -41,7 +42,7 @@ end
 function on_input(self, action_id, action)
 	if action_id == hash("touch") then
 		if action.pressed then
-			-- aqui
+			sound.play("#CashSound")
 			msg.post("/Clicker#Click", "increase_dolars")
 			-- left mouse button pressed
 			
