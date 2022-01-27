@@ -17,15 +17,34 @@ function on_message(self, message_id, message, sender)
 
 	if message_id == hash("NewCoin") then
 		numberOfCoins = numberOfCoins + 1
-		local pos =  vmath.vector3(5,150,0.5)
-		for i=1, numberOfCoins do
-			pos = pos + vmath.vector3(35, 0, 0)
+		if numberOfCoins < 30 then
+			local pos =  vmath.vector3(5,150,0.5)
+			for i=1, numberOfCoins do-- a la 10 siguiente fila
+				pos = pos + vmath.vector3(35, 0, 0)
+				if i == 11 or i == 20 or i == 30 then
+					pos.x = 40
+				end
+				if numberOfCoins >9 and numberOfCoins <20 then
+					if not(pos.y == 150-35) then
+						pos.y = 150-35
+					end
+				end
+				if numberOfCoins >19 and numberOfCoins <30 then
+					if not(pos.y == 150-(35*2)) then
+						pos.y = 150-(35*2)
+					end
+				end
+				if numberOfCoins >29 and numberOfCoins <40 then
+					if not(pos.y == 150-(35*3)) then
+						pos.y = 150-(35*3)
+					end
+				end
+			end
+
+			local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.1)
+			sound.play("#NewCoin")
+			msg.post("/Clicker#TextDollarsGui", "ReloadPie")
 		end
-		
-		local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.1)
-		sound.play("#NewCoin")
-		msg.post("/Clicker#TextDollarsGui", "ReloadPie")
-		self.numberOfClicks = 0	
 	end
 		
 	if message_id == hash("increase_dolars") then
@@ -35,6 +54,7 @@ function on_message(self, message_id, message, sender)
 
 		if self.numberOfClicks >= 10 then
 			msg.post("/Clicker#Click", "NewCoin")
+			self.numberOfClicks = 0
 		end	
 	end
 end
