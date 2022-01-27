@@ -35,6 +35,11 @@ function on_message(self, message_id, message, sender)
 			msg.post("/Clicker#Click", "increase_dolars")
 			print("entro")
 		end
+		if self.colName == "[/ButtonBar]" then
+			msg.post("/ButtonBar", "CreateBar")
+		end
+		--msg.post("#collisionobject", "disable")--/cursor#collisionobject
+		--self.pressed = false;
 	end
 	
 end

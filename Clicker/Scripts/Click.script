@@ -21,22 +21,22 @@ function on_message(self, message_id, message, sender)
 			local pos =  vmath.vector3(5,150,0.5)
 			for i=1, numberOfCoins do-- a la 10 siguiente fila
 				pos = pos + vmath.vector3(35, 0, 0)
-				if i == 11 or i == 20 or i == 30 then
+				if i == 10 or i == 20 or i == 30 then
 					pos.x = 40
 				end
 				if numberOfCoins >9 and numberOfCoins <20 then
 					if not(pos.y == 150-35) then
-						pos.y = 150-35
+						pos.y = 150-37
 					end
 				end
-				if numberOfCoins >19 and numberOfCoins <30 then
+				if numberOfCoins >18 and numberOfCoins <28 then
 					if not(pos.y == 150-(35*2)) then
-						pos.y = 150-(35*2)
+						pos.y = 150-(37*2)
 					end
 				end
 				if numberOfCoins >29 and numberOfCoins <40 then
 					if not(pos.y == 150-(35*3)) then
-						pos.y = 150-(35*3)
+						pos.y = 150-(37*3)
 					end
 				end
 			end

@@ -100,26 +100,6 @@ instances {
   }
 }
 instances {
-  id: "Bar"
-  prototype: "/Prefabs/Bar.go"
-  position {
-    x: 432.0
-    y: 339.0
-    z: 0.5
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.4
-    y: 0.4
-    z: 0.4
-  }
-}
-instances {
   id: "StreetFactories"
   prototype: "/Prefabs/Street.go"
   position {
