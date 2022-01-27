@@ -62,8 +62,8 @@ end
 function on_input(self, action_id, action)
 	if action_id == hash("touch") then
 		if action.pressed then
-			sound.play("#CashSound")
-			msg.post("/Clicker#Click", "increase_dolars")
+			--sound.play("#CashSound")
+			--msg.post("/Clicker#Click", "increase_dolars")
 			-- left mouse button pressed
 			
 		elseif action.released then

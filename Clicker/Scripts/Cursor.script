@@ -19,7 +19,7 @@ function update(self, dt)
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
 	local pos = go.get_position()
-	self.colName = nil
+	self.colName = ""
 	
 end
 
@@ -28,8 +28,13 @@ function on_message(self, message_id, message, sender)
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 	if message_id == hash("collision_response") then
-		self.colName = message.other_id
-
+		self.colName = message.other_id..""
+		print (self.colName.."" )
+		if self.colName == "[/Printer]" then
+			sound.play("/Clicker#CashSound")
+			msg.post("/Clicker#Click", "increase_dolars")
+			print("entro")
+		end
 	end
 	
 end
