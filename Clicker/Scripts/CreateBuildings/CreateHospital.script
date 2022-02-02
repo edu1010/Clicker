@@ -1,0 +1,35 @@
+function init(self)
+	-- Add initialization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+	self.numberOfHospitals = 0
+
+end
+
+go.property("cost_ofHospital", 200)
+
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Learn more: https://defold.com/manuals/message-passing/
+	-- Remove this function if not needed
+	
+	if message_id == hash("CreateHospital") then
+		if(numberOfDollars>=self.cost_ofHospital) then
+			numberOfDollars = numberOfDollars-self.cost_ofHospital
+			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+			local pos =  vmath.vector3(432,70,0.5)
+			self.numberOfHospitals = self.numberOfHospitals +1
+			if(self.numberOfHospitals <= 5)then
+				for i=1, self.numberOfHospitals do
+					if i>1 then
+						pos = pos + vmath.vector3(100, 0, 0)
+					end
+				end
+				local spawn = factory.create("#factoryHospital", pos, nil, nil, 0.4)
+			end
+		end
+
+	end
+
+end

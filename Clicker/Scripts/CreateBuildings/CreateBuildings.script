@@ -3,6 +3,8 @@ function init(self)
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
 	self.numberOfBars = 0
+	self.numberOfFactorys= 0
+	self.numberOfHospitals = 0
 	
 end
 go.property("cost_ofBars", 10)
@@ -42,9 +44,40 @@ function on_message(self, message_id, message, sender)
 		
 	end
 	if message_id == hash("CreateHospital") then
+		if(numberOfDollars>=self.cost_ofHospital) then
+			numberOfDollars = numberOfDollars-self.cost_ofHospital
+			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+			local pos =  vmath.vector3(432,70,0.5)
+			self.numberOfHospitals = self.numberOfHospitals +1
+			if(self.numberOfHospitals <= 5)then
+				for i=1, self.numberOfHospitals do
+					if i>1 then
+						pos = pos + vmath.vector3(100, 0, 0)
+					end
+				end
+				local spawn = factory.create("#factoryHospital", pos, nil, nil, 0.4)
+			end
+		end
+		
 	end
+	
 	if message_id == hash("CreateFactory") then
-	end
+		if(numberOfDollars>=self.cost_ofFactory) then
+			numberOfDollars = numberOfDollars-self.cost_ofFactory
+			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+			local pos =  vmath.vector3(432,201,0.5)
+			self.numberOfFactorys = self.numberOfFactorys +1
+			if(self.numberOfFactorys <= 5)then
+				for i=1, self.numberOfFactorys do
+					if i>1 then
+						pos = pos + vmath.vector3(100, 0, 0)
+					end
+				end
+				local spawn = factory.create("#factoryFactory", pos, nil, nil, 0.4)
+			end
+		end
+		end
+		
 end
 
 function on_input(self, action_id, action)

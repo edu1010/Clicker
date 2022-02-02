@@ -1,6 +1,6 @@
 components {
   id: "CreateBuildings"
-  component: "/Scripts/CreateBuildings.script"
+  component: "/Scripts/CreateBuildings/CreateBuildings.script"
   position {
     x: 0.0
     y: 0.0

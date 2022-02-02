@@ -20,66 +20,6 @@ instances {
   }
 }
 instances {
-  id: "ButtonBar"
-  prototype: "/Prefabs/Buttons/ButtonBar.go"
-  position {
-    x: 463.0
-    y: 534.0
-    z: 0.0
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.5
-    y: 0.5
-    z: 1.0
-  }
-}
-instances {
-  id: "ButtonFactory"
-  prototype: "/Prefabs/Buttons/ButtonFactory.go"
-  position {
-    x: 641.0
-    y: 534.0
-    z: 0.0
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.5
-    y: 0.5
-    z: 0.5
-  }
-}
-instances {
-  id: "ButtonHospital"
-  prototype: "/Prefabs/Buttons/ButtonHospital.go"
-  position {
-    x: 822.0
-    y: 534.0
-    z: 1.0
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.5
-    y: 0.5
-    z: 0.5
-  }
-}
-instances {
   id: "StreetBars"
   prototype: "/Prefabs/Street.go"
   position {
@@ -140,46 +80,6 @@ instances {
   }
 }
 instances {
-  id: "Factory"
-  prototype: "/Prefabs/Factory.go"
-  position {
-    x: 432.0
-    y: 201.0
-    z: 0.5
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.4
-    y: 0.4
-    z: 0.4
-  }
-}
-instances {
-  id: "Hospital"
-  prototype: "/Prefabs/Hospital.go"
-  position {
-    x: 432.0
-    y: 70.0
-    z: 0.5
-  }
-  rotation {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  scale3 {
-    x: 0.4
-    y: 0.4
-    z: 0.4
-  }
-}
-instances {
   id: "Background"
   prototype: "/Prefabs/Background.go"
   position {
@@ -197,6 +97,66 @@ instances {
     x: 1.0
     y: 1.0
     z: 1.0
+  }
+}
+instances {
+  id: "ButtonBar"
+  prototype: "/Prefabs/Buttons/ButtonBar.go"
+  position {
+    x: 463.0
+    y: 534.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.5
+    y: 0.5
+    z: 1.0
+  }
+}
+instances {
+  id: "ButtonFactory"
+  prototype: "/Prefabs/Buttons/ButtonFactory.go"
+  position {
+    x: 641.0
+    y: 534.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.5
+    y: 0.5
+    z: 0.5
+  }
+}
+instances {
+  id: "ButtonHospital"
+  prototype: "/Prefabs/Buttons/ButtonHospital.go"
+  position {
+    x: 822.0
+    y: 534.0
+    z: 1.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 0.5
+    y: 0.5
+    z: 0.5
   }
 }
 scale_along_z: 0
@@ -560,6 +520,29 @@ embedded_instances {
   "  }\n"
   "}\n"
   ""
+  position {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  scale3 {
+    x: 1.0
+    y: 1.0
+    z: 1.0
+  }
+}
+embedded_instances {
+  id: "Buttons"
+  children: "ButtonBar"
+  children: "ButtonFactory"
+  children: "ButtonHospital"
+  data: ""
   position {
     x: 0.0
     y: 0.0

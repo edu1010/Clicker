@@ -38,6 +38,14 @@ function on_message(self, message_id, message, sender)
 		if self.colName == "[/ButtonBar]" then
 			msg.post("/ButtonBar", "CreateBar")
 		end
+
+		if self.colName == "[/ButtonFactory]" then
+			msg.post("/ButtonFactory#CreateFactory", "CreateFactory")
+		end
+		if self.colName == "[/ButtonHospital]" then
+			msg.post("/ButtonHospital#CreateHospital", "CreateHospital")
+		end
+		
 		msg.post("#collisionobject", "disable")--/cursor#collisionobject
 		self.pressed = false;
 	end
