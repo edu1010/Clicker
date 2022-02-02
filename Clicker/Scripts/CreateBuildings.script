@@ -3,8 +3,11 @@ function init(self)
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
 	self.numberOfBars = 0
+	
 end
-
+go.property("cost_ofBars", 10)
+go.property("cost_ofFactory", 100)
+go.property("cost_ofHospital", 200)
 function final(self)
 	-- Add finalization code here
 	-- Learn more: https://defold.com/manuals/script/
@@ -22,8 +25,8 @@ function on_message(self, message_id, message, sender)
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 	if message_id == hash("CreateBar") then
-		if(numberOfDollars>=10) then
-			numberOfDollars = numberOfDollars-10
+		if(numberOfDollars>=self.cost_ofBars) then
+			numberOfDollars = numberOfDollars-self.cost_ofBars
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 			local pos =  vmath.vector3(432,339,0.5)
 			self.numberOfBars = self.numberOfBars +1
