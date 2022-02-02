@@ -1,3 +1,23 @@
+components {
+  id: "BuildingsIncrement"
+  component: "/Scripts/BuildingsIncrement.script"
+  position {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  }
+  rotation {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    w: 1.0
+  }
+  properties {
+    id: "incrementValue"
+    value: "50.0"
+    type: PROPERTY_TYPE_NUMBER
+  }
+}
 embedded_components {
   id: "spriteHospital"
   type: "sprite"

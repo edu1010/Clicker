@@ -1,39 +1,29 @@
+numberOfBars = 0
 function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
-	self.numberOfBars = 0
-	self.numberOfFactorys= 0
-	self.numberOfHospitals = 0
+
 	self.timer = 0
 end
 go.property("cost_ofBars", 10)
-go.property("cost_ofFactory", 100)
-go.property("cost_ofHospital", 200)
-function final(self)
-	-- Add finalization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
-end
 
-function update(self, dt)
-	-- Add update code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
-end
+
 
 function on_message(self, message_id, message, sender)
 	-- Add message-handling code here
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 	if message_id == hash("CreateBar") then
-		if(numberOfDollars>=self.cost_ofBars) and self.numberOfBars <= 5 then
+		if(numberOfDollars>=self.cost_ofBars) and numberOfBars <= 5 then
 			numberOfDollars = numberOfDollars-self.cost_ofBars
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+			numberOfBars = numberOfBars +1
+			msg.post("/Clicker#TextDollarsGui", "setBarsText",{numberOfDbarsT = numberOfBars })
 			local pos =  vmath.vector3(432,339,0.5)
-			self.numberOfBars = self.numberOfBars +1
-			if(self.numberOfBars <= 5)then
-				for i=1, self.numberOfBars do
+			
+			if(numberOfBars <= 5)then
+				for i=1, numberOfBars do
 					if i>1 then
 						pos = pos + vmath.vector3(100, 0, 0)
 					end
@@ -43,41 +33,6 @@ function on_message(self, message_id, message, sender)
 		end
 		
 	end
-	if message_id == hash("CreateHospital") then
-		if(numberOfDollars>=self.cost_ofHospital) and self.numberOfHospitals <= 5 then
-			numberOfDollars = numberOfDollars-self.cost_ofHospital
-			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
-			local pos =  vmath.vector3(432,70,0.5)
-			self.numberOfHospitals = self.numberOfHospitals +1
-			if(self.numberOfHospitals <= 5)then
-				for i=1, self.numberOfHospitals do
-					if i>1 then
-						pos = pos + vmath.vector3(100, 0, 0)
-					end
-				end
-				local spawn = factory.create("#factoryHospital", pos, nil, nil, 0.4)
-			end
-		end
-		
-	end
-	
-	if message_id == hash("CreateFactory") then
-		if(numberOfDollars>=self.cost_ofFactory) and self.numberOfFactorys <= 5 then
-			numberOfDollars = numberOfDollars-self.cost_ofFactory
-			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
-			local pos =  vmath.vector3(432,201,0.5)
-			self.numberOfFactorys = self.numberOfFactorys +1
-			if(self.numberOfFactorys <= 5)then
-				for i=1, self.numberOfFactorys do
-					if i>1 then
-						pos = pos + vmath.vector3(100, 0, 0)
-					end
-				end
-				local spawn = factory.create("#factoryFactory", pos, nil, nil, 0.4)
-			end
-		end
-		end
-		
 end
 
 function update(self, dt)

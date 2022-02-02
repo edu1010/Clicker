@@ -5,6 +5,7 @@ function init(self)
 	-- Remove this function if not needed
 	
 	self.numberOfDollarsT = 0
+
 end
 
 
@@ -30,5 +31,21 @@ function on_message(self, message_id, message, sender)
 
 	if message_id == hash("ReloadPie") then
 		gui.set_fill_angle(gui.get_node("PieClicks"), 0)
+	end
+
+
+	if message_id == hash("setBarsText") then
+		local str = " Bars:"..numberOfBars.."/5"
+		print(str,numberOfBars)
+		gui.set_text(gui.get_node("BarBuildings"),str)
+	end
+
+	if message_id == hash("setFactorysText") then
+		local str = " Factories:"..self.numberOfFactorysT.."/5"
+		gui.set_text(gui.get_node("BarBuildings"),str)
+	end
+	if message_id == hash("setHospitalText") then
+		local str = " Hospitals:"..self.numberOfHospitalsT.."/5"
+		gui.set_text(gui.get_node("BarBuildings"),str)
 	end
 end

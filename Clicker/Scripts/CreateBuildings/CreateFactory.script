@@ -3,7 +3,7 @@ function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
-	self.numberOfFactorys= 0
+	numberOfFactorys= 0
 end
 function on_message(self, message_id, message, sender)
 	-- Add message-handling code here
@@ -15,7 +15,7 @@ function on_message(self, message_id, message, sender)
 			numberOfDollars = numberOfDollars-self.cost_ofFactory
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 			local pos =  vmath.vector3(432,201,0.5)
-			self.numberOfFactorys = self.numberOfFactorys +1
+			numberOfFactorys = numberOfFactorys +1
 			if(self.numberOfFactorys <= 5)then
 				for i=1, self.numberOfFactorys do
 					if i>1 then
