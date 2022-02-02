@@ -4,6 +4,7 @@ function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
+	self.timer = 0
 	self.numberOfClicks = 0
 	numberOfDollars = 0
 	numberOfCoins = 0
@@ -51,11 +52,24 @@ function on_message(self, message_id, message, sender)
 		numberOfDollars = numberOfDollars+1
 		self.numberOfClicks = self.numberOfClicks + 1;
 		msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
-
 		if self.numberOfClicks >= 10 then
 			msg.post("/Clicker#Click", "NewCoin")
 			self.numberOfClicks = 0
 		end	
+	end
+end
+
+function update(self, dt)
+	-- Add update code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+	if go.get_scale("/Printer") == vmath.vector3(0.7, 0.7, 0.7) then
+		self.timer = self.timer + dt
+		if self.timer > 0.1 then
+			local originalScale = vmath.vector3(0.75, 0.75, 0.75)
+			go.set_scale(originalScale, "/Printer")
+			self.timer = 0
+		end
 	end
 end
 

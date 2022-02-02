@@ -32,6 +32,8 @@ function on_message(self, message_id, message, sender)
 		print (self.colName.."" )
 		if self.colName == "[/Printer]" then
 			sound.play("/Clicker#CashSound")
+			local scaleChanged = vmath.vector3(0.7, 0.7, 0.7)
+			go.set_scale(scaleChanged, "/Printer")
 			msg.post("/Clicker#Click", "increase_dolars")
 			print("entro")
 		end
