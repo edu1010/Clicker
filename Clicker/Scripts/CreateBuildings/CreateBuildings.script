@@ -5,7 +5,7 @@ function init(self)
 	self.numberOfBars = 0
 	self.numberOfFactorys= 0
 	self.numberOfHospitals = 0
-	
+	self.timer = 0
 end
 go.property("cost_ofBars", 10)
 go.property("cost_ofFactory", 100)
@@ -27,7 +27,7 @@ function on_message(self, message_id, message, sender)
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 	if message_id == hash("CreateBar") then
-		if(numberOfDollars>=self.cost_ofBars) then
+		if(numberOfDollars>=self.cost_ofBars) and self.numberOfBars <= 5 then
 			numberOfDollars = numberOfDollars-self.cost_ofBars
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 			local pos =  vmath.vector3(432,339,0.5)
@@ -44,7 +44,7 @@ function on_message(self, message_id, message, sender)
 		
 	end
 	if message_id == hash("CreateHospital") then
-		if(numberOfDollars>=self.cost_ofHospital) then
+		if(numberOfDollars>=self.cost_ofHospital) and self.numberOfHospitals <= 5 then
 			numberOfDollars = numberOfDollars-self.cost_ofHospital
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 			local pos =  vmath.vector3(432,70,0.5)
@@ -62,7 +62,7 @@ function on_message(self, message_id, message, sender)
 	end
 	
 	if message_id == hash("CreateFactory") then
-		if(numberOfDollars>=self.cost_ofFactory) then
+		if(numberOfDollars>=self.cost_ofFactory) and self.numberOfFactorys <= 5 then
 			numberOfDollars = numberOfDollars-self.cost_ofFactory
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 			local pos =  vmath.vector3(432,201,0.5)
@@ -78,6 +78,36 @@ function on_message(self, message_id, message, sender)
 		end
 		end
 		
+end
+
+function update(self, dt)
+	-- Add update code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+	if go.get_scale("/ButtonBar") == vmath.vector3(0.45, 0.45, 0.45) then
+		self.timer = self.timer + dt
+		if self.timer > 0.1 then
+			local originalScale = vmath.vector3(0.5, 0.5, 0.5)
+			go.set_scale(originalScale, "/ButtonBar")
+			self.timer = 0
+		end
+	end
+	if go.get_scale("/ButtonHospital") == vmath.vector3(0.45, 0.45, 0.45) then
+		self.timer = self.timer + dt
+		if self.timer > 0.1 then
+			local originalScale = vmath.vector3(0.5, 0.5, 0.5)
+			go.set_scale(originalScale, "/ButtonHospital")
+			self.timer = 0
+		end
+	end
+	if go.get_scale("/ButtonFactory") == vmath.vector3(0.45, 0.45, 0.45) then
+		self.timer = self.timer + dt
+		if self.timer > 0.1 then
+			local originalScale = vmath.vector3(0.5, 0.5, 0.5)
+			go.set_scale(originalScale, "/ButtonFactory")
+			self.timer = 0
+		end
+	end
 end
 
 function on_input(self, action_id, action)

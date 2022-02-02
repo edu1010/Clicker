@@ -71,7 +71,7 @@ embedded_components {
   "pivot: PIVOT_CENTER\n"
   "blend_mode: BLEND_MODE_ALPHA\n"
   "line_break: false\n"
-  "text: \"Cost: 1 Dollar\"\n"
+  "text: \"Cost: 200 Dollars\"\n"
   "font: \"/builtins/fonts/system_font.font\"\n"
   "material: \"/builtins/fonts/label.material\"\n"
   ""

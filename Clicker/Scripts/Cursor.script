@@ -38,13 +38,19 @@ function on_message(self, message_id, message, sender)
 			print("entro")
 		end
 		if self.colName == "[/ButtonBar]" then
+			local scaleChanged = vmath.vector3(0.45, 0.45, 0.45)
+			go.set_scale(scaleChanged, "/ButtonBar")
 			msg.post("/ButtonBar", "CreateBar")
 		end
 
 		if self.colName == "[/ButtonFactory]" then
+			local scaleChanged = vmath.vector3(0.45, 0.45, 0.45)
+			go.set_scale(scaleChanged, "/ButtonFactory")
 			msg.post("/ButtonFactory#CreateFactory", "CreateFactory")
 		end
 		if self.colName == "[/ButtonHospital]" then
+			local scaleChanged = vmath.vector3(0.45, 0.45, 0.45)
+			go.set_scale(scaleChanged, "/ButtonHospital")
 			msg.post("/ButtonHospital#CreateHospital", "CreateHospital")
 		end
 		
@@ -70,6 +76,8 @@ function on_input(self, action_id, action)
 	end
 	
 end
+
+
 
 function on_reload(self)
 	-- Add reload-handling code here
