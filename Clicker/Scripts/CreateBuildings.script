@@ -2,6 +2,7 @@ function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
+	self.numberOfBars = 0
 end
 
 function final(self)
@@ -21,8 +22,21 @@ function on_message(self, message_id, message, sender)
 	-- Learn more: https://defold.com/manuals/message-passing/
 	-- Remove this function if not needed
 	if message_id == hash("CreateBar") then
-		local pos =  vmath.vector3(432,339,0.5)
-		local spawnBar = factory.create("#factoryBar", pos, nil, nil, 0.4)
+		if(numberOfDollars>=10) then
+			numberOfDollars = numberOfDollars-10
+			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+			local pos =  vmath.vector3(432,339,0.5)
+			self.numberOfBars = self.numberOfBars +1
+			if(self.numberOfBars <= 5)then
+				for i=1, self.numberOfBars do
+					if i>1 then
+						pos = pos + vmath.vector3(100, 0, 0)
+					end
+				end
+				local spawnBar = factory.create("#factoryBar", pos, nil, nil, 0.4)
+			end
+		end
+		
 	end
 	if message_id == hash("CreateHospital") then
 	end
