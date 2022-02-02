@@ -41,11 +41,17 @@ function on_message(self, message_id, message, sender)
 	end
 
 	if message_id == hash("setFactorysText") then
-		local str = " Factories:"..self.numberOfFactorysT.."/5"
-		gui.set_text(gui.get_node("BarBuildings"),str)
+		local str = " Factories:"..numberOfFactorys.."/5"
+		gui.set_text(gui.get_node("FactoryBuildings"),str)
 	end
 	if message_id == hash("setHospitalText") then
-		local str = " Hospitals:"..self.numberOfHospitalsT.."/5"
-		gui.set_text(gui.get_node("BarBuildings"),str)
+		local str = " Hospitals:"..numberOfHospitals.."/5"
+		gui.set_text(gui.get_node("HospitalBuildings"),str)
+	end
+	--setCoinText
+	if message_id == hash("setCoinText") then
+		local str = " Coins:"..numberOfCoins.."/27"
+		print ("este, ",str)
+		gui.set_text(gui.get_node("Coins"),str)
 	end
 end

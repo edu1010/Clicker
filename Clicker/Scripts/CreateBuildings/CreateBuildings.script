@@ -18,11 +18,12 @@ function on_message(self, message_id, message, sender)
 		if(numberOfDollars>=self.cost_ofBars) and numberOfBars <= 5 then
 			numberOfDollars = numberOfDollars-self.cost_ofBars
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
-			numberOfBars = numberOfBars +1
-			msg.post("/Clicker#TextDollarsGui", "setBarsText",{numberOfDbarsT = numberOfBars })
+			
 			local pos =  vmath.vector3(432,339,0.5)
 			
-			if(numberOfBars <= 5)then
+			if(numberOfBars < 5)then
+				numberOfBars = numberOfBars +1
+				msg.post("/Clicker#TextDollarsGui", "setBarsText",{numberOfDbarsT = numberOfBars })
 				for i=1, numberOfBars do
 					if i>1 then
 						pos = pos + vmath.vector3(100, 0, 0)

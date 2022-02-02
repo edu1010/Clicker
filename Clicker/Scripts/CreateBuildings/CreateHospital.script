@@ -1,3 +1,4 @@
+
 function init(self)
 	-- Add initialization code here
 	-- Learn more: https://defold.com/manuals/script/
@@ -18,11 +19,12 @@ function on_message(self, message_id, message, sender)
 		if(numberOfDollars>=self.cost_ofHospital) then
 			numberOfDollars = numberOfDollars-self.cost_ofHospital
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
-			self.numberOfHospitals = self.numberOfHospitals +1
-			msg.post("/Clicker#TextDollarsGui", "setHospitalText",{numberOfHospitalsT = numberOfHospitals })
+			
 			local pos =  vmath.vector3(432,70,0.5)
 			
-			if(self.numberOfHospitals <= 5)then
+			if(numberOfHospitals < 5)then
+				numberOfHospitals = numberOfHospitals +1
+				msg.post("/Clicker#TextDollarsGui", "setHospitalText",{numberOfHospitalsT = numberOfHospitals })
 				for i=1, self.numberOfHospitals do
 					if i>1 then
 						pos = pos + vmath.vector3(100, 0, 0)

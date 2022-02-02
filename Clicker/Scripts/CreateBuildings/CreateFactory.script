@@ -15,9 +15,11 @@ function on_message(self, message_id, message, sender)
 			numberOfDollars = numberOfDollars-self.cost_ofFactory
 			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 			local pos =  vmath.vector3(432,201,0.5)
-			numberOfFactorys = numberOfFactorys +1
-			if(self.numberOfFactorys <= 5)then
-				for i=1, self.numberOfFactorys do
+
+			if(numberOfFactorys < 5)then
+				numberOfFactorys = numberOfFactorys +1
+				msg.post("/Clicker#TextDollarsGui", "setFactorysText")
+				for i=1, numberOfFactorys do
 					if i>1 then
 						pos = pos + vmath.vector3(100, 0, 0)
 					end

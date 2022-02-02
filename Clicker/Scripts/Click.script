@@ -38,6 +38,7 @@ function on_message(self, message_id, message, sender)
 			end
 
 			local spawnCoin = factory.create("/Clicker#factory", pos, nil, nil, 0.1)
+			msg.post("/Clicker#TextDollarsGui", "setCoinText")
 			sound.play("#NewCoin")
 			msg.post("/Clicker#TextDollarsGui", "ReloadPie")
 		end
