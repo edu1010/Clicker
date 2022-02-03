@@ -8,11 +8,6 @@ function init(self)
 	self.pressed = false
 end
 
-function final(self)
-	-- Add finalization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
-end
 
 function update(self, dt)
 	-- Add update code here
@@ -24,9 +19,6 @@ function update(self, dt)
 end
 
 function on_message(self, message_id, message, sender)
-	-- Add message-handling code here
-	-- Learn more: https://defold.com/manuals/message-passing/
-	-- Remove this function if not needed
 	if message_id == hash("collision_response") then
 		self.colName = message.other_id..""
 		print (self.colName.."" )
@@ -53,7 +45,6 @@ function on_message(self, message_id, message, sender)
 			go.set_scale(scaleChanged, "/ButtonHospital")
 			msg.post("/ButtonHospital#CreateHospital", "CreateHospital")
 		end
-		
 		msg.post("#collisionobject", "disable")--/cursor#collisionobject
 		self.pressed = false;
 	end
