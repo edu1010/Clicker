@@ -17,15 +17,16 @@ function on_message(self, message_id, message, sender)
 	
 	if message_id == hash("CreateHospital") then
 		if(numberOfDollars>=self.cost_ofHospital) then
-			numberOfDollars = numberOfDollars-self.cost_ofHospital
-			msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
+			
 			
 			local pos =  vmath.vector3(432,70,0.5)
 			
 			if(numberOfHospitals < 5)then
+				numberOfDollars = numberOfDollars-self.cost_ofHospital
+				msg.post("/Clicker#TextDollarsGui", "setText",{numberOfDollarsT = numberOfDollars })
 				numberOfHospitals = numberOfHospitals +1
 				msg.post("/Clicker#TextDollarsGui", "setHospitalText",{numberOfHospitalsT = numberOfHospitals })
-				for i=1, self.numberOfHospitals do
+				for i=1, numberOfHospitals do
 					if i>1 then
 						pos = pos + vmath.vector3(100, 0, 0)
 					end

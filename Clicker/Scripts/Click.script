@@ -17,8 +17,9 @@ function on_message(self, message_id, message, sender)
 	-- Remove this function if not needed
 
 	if message_id == hash("NewCoin") then
-		numberOfCoins = numberOfCoins + 1
-		if numberOfCoins <= 27 then
+		
+		if numberOfCoins < 27 then
+			numberOfCoins = numberOfCoins + 1
 			local pos =  vmath.vector3(5,150,0.5)
 			for i=1, numberOfCoins do-- a la 10 siguiente fila
 				pos = pos + vmath.vector3(35, 0, 0)
