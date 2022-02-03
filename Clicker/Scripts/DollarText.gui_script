@@ -16,7 +16,7 @@ function on_message(self, message_id, message, sender)
 	if message_id == hash("setText") then
 		local str = numberOfDollars.. " Dollars"
 		gui.set_text(gui.get_node("NodeText"),str)
-		if numberOfCoins <= 27 then
+		if numberOfCoins < 27 then
 			if(gui.get_fill_angle(gui.get_node("PieClicks")) == 360) then
 				gui.set_fill_angle(gui.get_node("PieClicks"), 0)
 			else
