@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://scripts/hud.gd" id="14_hud"]
 [ext_resource type="Script" path="res://scripts/pie.gd" id="15_pie"]
 [ext_resource type="Script" path="res://scripts/menu.gd" id="16_menu"]
+[ext_resource type="Script" path="res://scripts/music.gd" id="17_music"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_game")
@@ -45,7 +46,7 @@ position = Vector2(360, 550)
 
 [node name="Printer" parent="." instance=ExtResource("5_printer")]
 z_index = 2
-position = Vector2(176, 252)
+position = Vector2(176, 266)
 
 [node name="Buttons" type="Node2D" parent="."]
 
@@ -118,9 +119,17 @@ z_index = 50
 
 [node name="NewCoinSound" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("13_new_coin")
+max_polyphony = 3
+bus = &"SFX"
 
 [node name="CoinSound" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("13_coin")
+max_polyphony = 3
+bus = &"SFX"
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+bus = &"Music"
+script = ExtResource("17_music")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("14_hud")

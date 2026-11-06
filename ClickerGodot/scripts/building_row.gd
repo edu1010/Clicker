@@ -8,22 +8,56 @@ const BUILDING_HEIGHT := 50.0
 const FIRST_X := 50.0
 const SPACING := 84.0
 const PLACEHOLDER_SIZE := Vector2(62, 46)
+## La calle "evoluciona" (cielo con nubes) a partir de este nivel de hito (25 edificios).
+const CLOUDS_MILESTONE := 2
+const CLOUD_SPEED := 25.0
+const NIGHT_TINT := Color(0.35, 0.4, 0.7)
+const LOCKED_TINT := Color(0.45, 0.45, 0.5)
 
 var _texture: Texture2D
 var _shown := 0
+var _night := 0.0
+var _unlocked := true
 
 @onready var _street: CanvasItem = $Street
+@onready var _clouds: Sprite2D = $Clouds
 @onready var _buildings: Node2D = $Buildings
+@onready var _traffic: Traffic = $Traffic
 @onready var _info: Label = $Info
 
 
+func _process(delta: float) -> void:
+	if _clouds.visible:
+		_clouds.region_rect.position.x = fmod(_clouds.region_rect.position.x + CLOUD_SPEED * delta,
+				_clouds.texture.get_width())
+
+
 func show_building(button: ShopButton, unlocked: bool, income: float) -> void:
-	_street.modulate = Color.WHITE if unlocked else Color(0.45, 0.45, 0.5)
+	_unlocked = unlocked
 	if unlocked:
 		_info.text = "%s x%d\n%s $/s" % [button.building_name, button.count, Fmt.small(income)]
 	else:
 		_info.text = "???"
+	_clouds.visible = unlocked and button.milestone_level() >= CLOUDS_MILESTONE
+	_traffic.set_car_count(0 if button.count == 0 else mini(5, 1 + button.milestone_level()))
+	_apply_tint()
 	_sync_sprites(button)
+
+
+## 0 = día, 1 = noche.
+func set_daylight(night: float) -> void:
+	_night = night
+	_traffic.night = night
+	_apply_tint()
+
+
+func _apply_tint() -> void:
+	var tint := Color.WHITE.lerp(NIGHT_TINT, _night)
+	if not _unlocked:
+		tint *= LOCKED_TINT
+	_street.modulate = tint
+	_clouds.modulate = tint
+	_buildings.modulate = Color.WHITE.lerp(tint, 0.6)
 
 
 ## Vacía la calle (al fundar una ciudad nueva).

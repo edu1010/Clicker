@@ -54,6 +54,11 @@ const OFFLINE_EFFICIENCY_UPGRADED := 0.75
 const OFFLINE_MAX_SECONDS := 8.0 * 3600.0
 const OFFLINE_MIN_SECONDS := 60.0
 
+## Duración de un ciclo día/noche en segundos.
+const DAY_LENGTH := 240.0
+const DOLLARS_LABEL_POS := Vector2(175, 86)
+const VOLUME_BUSES := ["Master", "Music", "SFX"]
+
 const GOLD := Color(1.0, 0.85, 0.3)
 const GREEN := Color(0.7, 1.0, 0.6)
 const RED := Color(1.0, 0.45, 0.45)
@@ -93,6 +98,7 @@ var events_resolved := 0
 
 var combo := 1.0
 var fx_enabled := true
+var day_time := 0.0
 var buttons: Array[ShopButton] = []
 var rows: Array[BuildingRow] = []
 var achievement_list: Array[Dictionary] = GameData.achievements()
@@ -142,6 +148,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	time_played += delta
+	day_time = fmod(day_time + delta, DAY_LENGTH)
+	var night := night_amount()
+	for row in rows:
+		row.set_daylight(night)
 	_tick_modifiers(delta)
 	_pay_buildings(delta)
 	_tick_payouts(delta)
@@ -342,6 +352,7 @@ func _on_printer_pressed() -> void:
 	earn(value)
 	if fx_enabled:
 		_popup(get_global_mouse_position(), "+" + Fmt.small(value), GOLD, 20)
+		Fx.burst(effects, printer.position + Vector2(0, 60), Fx.BILLS, 6, 200.0, 45.0)
 
 
 # --- Compras -----------------------------------------------------------------------
@@ -359,6 +370,7 @@ func _on_shop_button_pressed(button: ShopButton) -> void:
 	if button.milestone_level() > level_before:
 		var row := rows[buttons.find(button)]
 		_popup(row.position + Vector2(295, 40), "%s x2!" % button.building_name, GOLD, 24, true)
+		_confetti(row.position + Vector2(295, 40))
 	_refresh()
 
 
@@ -374,6 +386,7 @@ func buy_building_upgrade(index: int) -> void:
 	dollars -= b.next_upgrade_cost()
 	hud.toast("%s bought: %s x2!" % [b.next_upgrade_name(), b.building_name])
 	b.upgrades_bought += 1
+	_confetti(rows[index].position + Vector2(200, 30))
 	_refresh()
 
 
@@ -418,6 +431,8 @@ func prestige() -> void:
 	cities += 1
 	_reset_city()
 	hud.toast("New city founded! +%d reputation." % gain)
+	for x in [250.0, 480.0, 710.0]:
+		_confetti(Vector2(x, 320))
 	if use_save:
 		save_game()
 
@@ -473,6 +488,7 @@ func check_achievements() -> void:
 		if not achievements.has(a.id) and a.check.call(self):
 			achievements[a.id] = true
 			hud.toast("Achievement: %s  (+1%% income)" % a.name)
+			_play($CoinSound, 1.4)
 
 
 # --- Eventos -----------------------------------------------------------------------
@@ -512,12 +528,14 @@ func spawn_golden_coin(kind := "gold", chain := 0) -> GoldenCoin:
 	coin.position = area.position + Vector2(randf() * area.size.x, randf() * area.size.y)
 	coin.collected.connect(_on_golden_collected)
 	golden_root.add_child(coin)
-	$CoinSound.play()
+	_play($CoinSound, 0.8 if kind == "red" else 1.0 + 0.08 * chain)
 	return coin
 
 
 func _on_golden_collected(coin: GoldenCoin) -> void:
-	$NewCoinSound.play()
+	_play($NewCoinSound)
+	if fx_enabled:
+		Fx.fly(effects, CoinScene, coin.position, DOLLARS_LABEL_POS)
 	if coin.kind == "red":
 		_collect_red(coin)
 	else:
@@ -627,6 +645,36 @@ func _popup(at: Vector2, text: String, color: Color, size: int, always := false)
 		FloatingText.spawn(effects, at, text, color, size)
 
 
+func _confetti(at: Vector2) -> void:
+	if fx_enabled:
+		Fx.confetti(effects, at)
+
+
+func _play(player: AudioStreamPlayer, pitch := 1.0) -> void:
+	player.pitch_scale = pitch
+	player.play()
+
+
+## 0 = pleno día, 1 = noche cerrada.
+func night_amount() -> float:
+	return smoothstep(0.25, 0.75, 0.5 - 0.5 * cos(TAU * day_time / DAY_LENGTH))
+
+
+func set_volume(bus: String, linear: float) -> void:
+	var index := AudioServer.get_bus_index(bus)
+	if index < 0:
+		return
+	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(linear, 0.0001)))
+	AudioServer.set_bus_mute(index, linear <= 0.001)
+
+
+func get_volume(bus: String) -> float:
+	var index := AudioServer.get_bus_index(bus)
+	if index < 0 or AudioServer.is_bus_mute(index):
+		return 0.0
+	return db_to_linear(AudioServer.get_bus_volume_db(index))
+
+
 func set_fx(enabled: bool) -> void:
 	fx_enabled = enabled
 
@@ -659,6 +707,8 @@ func save_game() -> void:
 	cfg.set_value("progress", "achievements", achievements.keys())
 	cfg.set_value("settings", "fx_enabled", fx_enabled)
 	cfg.set_value("settings", "scientific", Fmt.scientific)
+	for bus in VOLUME_BUSES:
+		cfg.set_value("volume", bus, get_volume(bus))
 	cfg.save(save_path)
 
 
@@ -691,6 +741,9 @@ func load_game() -> void:
 		achievements[id] = true
 	fx_enabled = cfg.get_value("settings", "fx_enabled", true)
 	Fmt.scientific = cfg.get_value("settings", "scientific", false)
+	for bus in VOLUME_BUSES:
+		if cfg.has_section_key("volume", bus):
+			set_volume(bus, cfg.get_value("volume", bus))
 
 	var saved_at: float = cfg.get_value("game", "saved_at", Time.get_unix_time_from_system())
 	var away := clampf(Time.get_unix_time_from_system() - saved_at, 0.0, OFFLINE_MAX_SECONDS)
