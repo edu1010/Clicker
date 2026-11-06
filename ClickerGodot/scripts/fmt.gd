@@ -5,9 +5,16 @@ extends RefCounted
 const SUFFIXES := ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"]
 
 
+## Opción del menú: notación científica (1.23e9) en vez de sufijos.
+static var scientific := false
+
+
 static func money(value: float) -> String:
 	if value < 1000.0:
 		return str(floori(value))
+	if scientific and value >= 1e6:
+		var exponent := floori(log(value) / log(10.0) + 1e-9)
+		return "%.2fe%d" % [value / pow(10.0, exponent), exponent]
 	var tier := floori(log(value) / log(1000.0) + 1e-9)
 	if tier >= SUFFIXES.size():
 		return String.num_scientific(value)

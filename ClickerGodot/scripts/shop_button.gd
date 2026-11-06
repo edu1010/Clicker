@@ -22,8 +22,17 @@ const REVEAL_FRACTION := 0.5
 @export var milestone_texture: Texture2D
 ## Color del placeholder cuando no hay textura.
 @export var placeholder_color := Color(0.5, 0.5, 0.5)
+## Nombres de las 4 mejoras de este edificio (cada una duplica su producción).
+@export var upgrade_names := PackedStringArray()
+## Bonus por cada edificio del siguiente tipo (sinergia). 0.02 = +2 % por unidad.
+@export var synergy_from_next := 0.0
+
+## Edificios necesarios y multiplicador de coste (sobre base_cost) de cada mejora.
+const UPGRADE_THRESHOLDS: Array[int] = [1, 5, 25, 50]
+const UPGRADE_COST_FACTORS: Array[float] = [10.0, 50.0, 500.0, 50000.0]
 
 var count := 0
+var upgrades_bought := 0
 ## Tiempo acumulado hacia el próximo pago.
 var timer := 0.0
 
@@ -65,8 +74,30 @@ func next_milestone() -> int:
 	return (floori(count / 50.0) + 1) * 50
 
 
-func income(global_multiplier: float) -> float:
-	return income_per_second * count * pow(2.0, milestone_level()) * global_multiplier
+func income(multiplier: float) -> float:
+	return income_per_second * count * pow(2.0, milestone_level() + upgrades_bought) * multiplier
+
+
+func has_more_upgrades() -> bool:
+	return upgrades_bought < UPGRADE_THRESHOLDS.size()
+
+
+func next_upgrade_name() -> String:
+	if upgrades_bought < upgrade_names.size():
+		return upgrade_names[upgrades_bought]
+	return "%s upgrade %d" % [title, upgrades_bought + 1]
+
+
+func next_upgrade_threshold() -> int:
+	return UPGRADE_THRESHOLDS[upgrades_bought]
+
+
+func next_upgrade_cost() -> float:
+	return base_cost * UPGRADE_COST_FACTORS[upgrades_bought]
+
+
+func next_upgrade_ready() -> bool:
+	return has_more_upgrades() and count >= next_upgrade_threshold()
 
 
 func current_building_texture() -> Texture2D:

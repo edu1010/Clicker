@@ -26,6 +26,14 @@ func show_building(button: ShopButton, unlocked: bool, income: float) -> void:
 	_sync_sprites(button)
 
 
+## Vacía la calle (al fundar una ciudad nueva).
+func reset() -> void:
+	for child in _buildings.get_children():
+		child.queue_free()
+	_shown = 0
+	_texture = null
+
+
 ## Punto (local) donde mostrar los "+X $" de esta calle.
 func popup_point() -> Vector2:
 	var visible_count := maxi(1, mini(_shown, MAX_SPRITES))
