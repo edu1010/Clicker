@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/building_row.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Streets/Street.png" id="2_street"]
+
+[node name="BuildingRow" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Street" type="NinePatchRect" parent="."]
+offset_right = 590.0
+offset_bottom = 78.0
+mouse_filter = 2
+texture = ExtResource("2_street")
+patch_margin_bottom = 18
+axis_stretch_horizontal = 1
+
+[node name="Buildings" type="Node2D" parent="."]
+
+[node name="Info" type="Label" parent="."]
+offset_left = 440.0
+offset_top = 4.0
+offset_right = 582.0
+offset_bottom = 58.0
+mouse_filter = 2
+theme_override_colors/font_outline_color = Color(0.15, 0.2, 0.25, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 13
+text = "???"
+horizontal_alignment = 2
+vertical_alignment = 1

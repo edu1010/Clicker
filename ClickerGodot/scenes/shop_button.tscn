@@ -1,37 +1,56 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/shop_button.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/placeholder.gd" id="2_placeholder"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_button"]
-size = Vector2(260, 256)
+size = Vector2(114, 180)
 
 [node name="ShopButton" type="Area2D"]
-scale = Vector2(0.5, 0.5)
 script = ExtResource("1_script")
-
-[node name="Sprite" type="Sprite2D" parent="."]
+pressed_scale = 0.92
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -2)
 shape = SubResource("RectangleShape2D_button")
 
 [node name="TitleLabel" type="Label" parent="."]
-z_index = 20
-offset_left = -250.0
-offset_top = -176.0
-offset_right = 250.0
-offset_bottom = -128.0
-theme_override_font_sizes/font_size = 32
-text = "Make a New Building"
+offset_left = -58.0
+offset_top = -90.0
+offset_right = 58.0
+offset_bottom = -68.0
+theme_override_font_sizes/font_size = 14
+text = "Building"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="IconRoot" type="Node2D" parent="."]
+position = Vector2(0, -14)
+
+[node name="Sprite" type="Sprite2D" parent="IconRoot"]
+scale = Vector2(0.34, 0.34)
+
+[node name="Placeholder" type="Node2D" parent="IconRoot"]
+script = ExtResource("2_placeholder")
+size = Vector2(80, 80)
+
 [node name="CostLabel" type="Label" parent="."]
-z_index = 20
-offset_left = -250.0
-offset_top = 137.0
-offset_right = 250.0
-offset_bottom = 185.0
-theme_override_font_sizes/font_size = 32
-text = "Cost: 0 Dollars"
+offset_left = -58.0
+offset_top = 34.0
+offset_right = 58.0
+offset_bottom = 54.0
+theme_override_font_sizes/font_size = 14
+text = "0 $"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="InfoLabel" type="Label" parent="."]
+offset_left = -58.0
+offset_top = 54.0
+offset_right = 58.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(0.82, 0.82, 0.82, 1)
+theme_override_font_sizes/font_size = 11
+text = "x0"
 horizontal_alignment = 1
 vertical_alignment = 1

@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/golden_coin.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin1.png" id="f1"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin2.png" id="f2"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin3.png" id="f3"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin4.png" id="f4"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_golden"]
+animations = [{
+"frames": [{"duration": 1.0, "texture": ExtResource("f1")}, {"duration": 1.0, "texture": ExtResource("f2")}, {"duration": 1.0, "texture": ExtResource("f3")}, {"duration": 1.0, "texture": ExtResource("f4")}],
+"loop": true,
+"name": &"default",
+"speed": 10.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_golden"]
+radius = 38.0
+
+[node name="GoldenCoin" type="Area2D"]
+script = ExtResource("1_script")
+pressed_scale = 0.85
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+scale = Vector2(0.2, 0.2)
+sprite_frames = SubResource("SpriteFrames_golden")
+autoplay = "default"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_golden")

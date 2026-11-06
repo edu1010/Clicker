@@ -1,11 +1,9 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/coin.gd" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin1.png" id="f1"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin2.png" id="f2"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin3.png" id="f3"]
 [ext_resource type="Texture2D" path="res://assets/sprites/Coins/Coin4.png" id="f4"]
-[ext_resource type="AudioStream" path="res://assets/sounds/CoinSound.ogg" id="2_sound"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_coin"]
 animations = [{
@@ -19,13 +17,3 @@ animations = [{
 scale = Vector2(0.1, 0.1)
 sprite_frames = SubResource("SpriteFrames_coin")
 autoplay = "default"
-script = ExtResource("1_script")
-
-[node name="Timer" type="Timer" parent="."]
-wait_time = 3.0
-autostart = true
-
-[node name="CoinSound" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("2_sound")
-
-[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]
