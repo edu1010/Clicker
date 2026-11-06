@@ -122,6 +122,7 @@ var _resetting := false
 
 
 func _ready() -> void:
+	hud.apply_theme(UiTheme.create())
 	# La moneda dorada (z alto) debe recibir el clic antes que lo que tenga debajo.
 	get_viewport().physics_object_picking_sort = true
 	get_viewport().physics_object_picking_first_only = true
@@ -414,6 +415,12 @@ static func reputation_for(earned: float) -> int:
 
 func pending_reputation() -> int:
 	return maxi(0, reputation_for(lifetime_earned) - prestige_points)
+
+
+## Fracción (0..1) del camino hacia el siguiente punto de Reputación.
+func reputation_progress() -> float:
+	var level := sqrt(maxf(lifetime_earned, 0.0) / PRESTIGE_DIVISOR)
+	return level - floorf(level)
 
 
 ## Dinero total que hace falta (de por vida) para el siguiente punto de Reputación.

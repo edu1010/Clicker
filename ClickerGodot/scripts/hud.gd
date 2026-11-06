@@ -34,6 +34,8 @@ func _ready() -> void:
 	_menu.pressed.connect(menu_pressed.emit)
 	_event.confirmed.connect(_on_event_choice.bind(true))
 	_event.canceled.connect(_on_event_choice.bind(false))
+	_event.get_ok_button().theme_type_variation = &"GoldButton"
+	_welcome.get_ok_button().theme_type_variation = &"GoldButton"
 	_toast.visible = false
 
 
@@ -48,6 +50,15 @@ func _process(delta: float) -> void:
 		_toast.visible = true
 		_toast.modulate.a = 1.0
 		_toast_left = TOAST_TIME
+
+
+## El tema no atraviesa el CanvasLayer, así que se asigna a cada control/ventana raíz.
+func apply_theme(ui_theme: Theme) -> void:
+	for child in get_children():
+		if child is Control:
+			child.theme = ui_theme
+		elif child is Window:
+			child.theme = ui_theme
 
 
 func set_dollars(text: String) -> void:
@@ -95,7 +106,7 @@ func set_upgrade(which: String, text: String, enabled: bool) -> void:
 
 func set_menu_badge(has_news: bool) -> void:
 	_menu.text = "Menu •" if has_news else "Menu"
-	_menu.modulate = Color(1.0, 0.85, 0.3) if has_news else Color.WHITE
+	_menu.theme_type_variation = &"GoldButton" if has_news else &""
 
 
 func toast(text: String) -> void:
