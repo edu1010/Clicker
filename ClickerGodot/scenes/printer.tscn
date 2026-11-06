@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/clickable.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora1.png" id="f1"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora2.png" id="f2"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora3.png" id="f3"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora4.png" id="f4"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora5.png" id="f5"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora6.png" id="f6"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora7.png" id="f7"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora8.png" id="f8"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora9.png" id="f9"]
+[ext_resource type="Texture2D" path="res://assets/sprites/Printer/impresora10.png" id="f10"]
+[ext_resource type="AudioStream" path="res://assets/sounds/CashSounds.ogg" id="2_cash"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_printer"]
+animations = [{
+"frames": [{"duration": 1.0, "texture": ExtResource("f1")}, {"duration": 1.0, "texture": ExtResource("f2")}, {"duration": 1.0, "texture": ExtResource("f3")}, {"duration": 1.0, "texture": ExtResource("f4")}, {"duration": 1.0, "texture": ExtResource("f5")}, {"duration": 1.0, "texture": ExtResource("f6")}, {"duration": 1.0, "texture": ExtResource("f7")}, {"duration": 1.0, "texture": ExtResource("f8")}, {"duration": 1.0, "texture": ExtResource("f9")}, {"duration": 2.0, "texture": ExtResource("f10")}],
+"loop": true,
+"name": &"default",
+"speed": 8.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_printer"]
+size = Vector2(270, 206)
+
+[node name="Printer" type="Area2D"]
+scale = Vector2(0.75, 0.75)
+script = ExtResource("1_script")
+pressed_scale = 0.9333
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_printer")
+autoplay = "default"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 70)
+shape = SubResource("RectangleShape2D_printer")
+
+[node name="CashSound" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_cash")
