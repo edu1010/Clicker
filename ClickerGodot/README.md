@@ -92,6 +92,10 @@ Ya hay un preset **Web** en `export_presets.cfg` (sin hilos, compatible con itch
 2. *Project → Export → Web → Export Project* → se genera `build/web/index.html`.
 3. Comprime la carpeta `build/web` en un .zip y súbelo a itch.io como juego HTML5.
 
+## Diseño y próximas mejoras
+
+La [investigación de diseño de incrementales](docs/INVESTIGACION_DISENO_INCREMENTALES.md) reúne referencias, GDD públicos, diagnóstico del juego y propuestas de balance. Incluye el requisito de que fundar ciudades tenga coste; el cobro aún está pendiente de implementación.
+
 ## Estructura
 | Archivo | Qué hace |
 |---------|----------|
