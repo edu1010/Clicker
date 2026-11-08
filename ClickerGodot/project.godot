@@ -18,8 +18,10 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 [display]
 
 window/size/viewport_width=960
-window/size/viewport_height=640
+window/size/viewport_height=688
 window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+window/per_pixel_transparency/allowed=true
 
 [rendering]
 

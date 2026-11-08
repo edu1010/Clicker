@@ -39,7 +39,7 @@ Cada 3–6 min aparece un evento con dos opciones (inspección de Hacienda, huel
 festival, inversor, turistas, apagón).
 
 ### Prestigio
-**Menú → Reputation → Found a new city.** Reinicias la ciudad (dinero, edificios
+**Menú → Reputation → Found a new city.** Reinicias solo la ciudad seleccionada (dinero, edificios
 y mejoras) a cambio de **Reputación** = √(dinero ganado en total / 100.000).
 Cada punto da +1 % de ingresos para siempre y se gasta en mejoras permanentes:
 Head Start, Seed Money, Lucky Charm, Night Owl y Golden Age.
@@ -51,6 +51,28 @@ Head Start, Seed Money, Lucky Charm, Night Owl y Golden Age.
 Ciclo día/noche (4 min) con farolas, coches que aumentan con los hitos y
 cielo con nubes en las calles que superan los 25 edificios.
 
+### Widget de escritorio (Windows)
+- Pulsa **Widget** en la barra superior o actívalo en **Menú → Options**.
+- Se convierte en una ventana pequeña sin bordes, inicialmente en la esquina inferior derecha.
+- **Mover:** arrastra el título de la ciudad en la barra superior.
+- **Tamaño:** arrastra un borde o el tirador **◢** de la esquina inferior derecha.
+  Conserva la proporción del juego; mínimo 480 × 344 píxeles.
+- **Pin:** activa/desactiva mantenerlo por encima de otras ventanas.
+- **−** minimiza y **×** guarda y cierra. **Normal** recupera la ventana anterior.
+- Se guardan el modo, tamaño, posición y Pin; al reconectar se ajusta a los monitores disponibles.
+- Usa una ventana independiente: desactiva *Embed Game on Play* en el editor de Godot.
+  En la versión web el widget está deshabilitado.
+
+### Varias ciudades
+- **+** crea una ciudad independiente sin borrar las anteriores.
+- **‹ / ›** cambia de ciudad y vuelve al principio/final al llegar al extremo.
+- Cada ciudad mantiene dinero, edificios, mejoras, efectos y pagos pendientes.
+  Las demás siguen produciendo mientras juegas; los efectos temporales caducan.
+- Reputación, monedas doradas, logros y estadísticas generales son compartidos.
+- El prestigio reinicia solo la ciudad seleccionada; no afecta a las otras ciudades.
+- Los eventos con una decisión pendiente deben resolverse antes de cambiar de ciudad.
+- Las partidas anteriores se convierten automáticamente en la primera ciudad.
+
 ### Opciones (Menú → Options)
 Efectos visuales, formato de números (1.23M / 1.23e6), volumen general/música/efectos
 y reiniciar la partida.
@@ -58,6 +80,11 @@ y reiniciar la partida.
 ### Guardado
 Automático cada 10 s y al cerrar. Al volver ganas el 50 % (75 % con Night Owl)
 de tu producción del tiempo fuera, máximo 8 h.
+
+## Exportar a Windows
+Selecciona **Project → Export → Windows Desktop → Export Project**.
+El preset genera `build/windows/MoneyClicker.exe` con el paquete incluido.
+Instala primero las plantillas de exportación de tu versión de Godot.
 
 ## Exportar a web (itch.io)
 Ya hay un preset **Web** en `export_presets.cfg` (sin hilos, compatible con itch.io).
@@ -86,3 +113,11 @@ Para dar arte a Banco y Casino basta con asignar `button_texture` y `building_te
 Para usar música real, pon un `.ogg` en el nodo `Music` y quítale el script.
 
 Para empezar de cero: Menú → Options → Reset game.
+
+## Comprobaciones
+- `godot --headless --path ClickerGodot --script res://tests/test_world.gd`:
+  ciudades independientes, producción y efectos, guardado, migración y prestigio.
+- `godot --path ClickerGodot --script res://tests/test_desktop.gd`:
+  flags de ventana, tamaño, posición, guardado del widget y retorno a normal en Windows.
+- `godot --path ClickerGodot --script res://tests/preview_widget.gd`:
+  vista interactiva con dos ciudades de prueba; no lee ni modifica tu partida.

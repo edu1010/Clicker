@@ -47,7 +47,7 @@ const BOOST_GROWTH := 10.0
 const BOOST_PER_LEVEL := 0.01
 const UPGRADE_REVEAL_FRACTION := 0.5
 
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const AUTOSAVE_TIME := 10.0
 const OFFLINE_EFFICIENCY := 0.5
 const OFFLINE_EFFICIENCY_UPGRADED := 0.75
@@ -105,6 +105,11 @@ var achievement_list: Array[Dictionary] = GameData.achievements()
 var reputation_list: Array[Dictionary] = GameData.reputation_upgrades()
 var event_list: Array[Dictionary] = GameData.events()
 
+# Cada ciudad conserva su economía; el legado sigue siendo compartido.
+var city_states: Array[Dictionary] = []
+var active_city := 0
+var desktop: DesktopMode
+
 var _shown_dollars := 0.0
 var _golden_timer := 0.0
 var _event_timer := 0.0
@@ -122,6 +127,8 @@ var _resetting := false
 
 
 func _ready() -> void:
+	position.y = 48
+	hud.offset.y = 48
 	hud.apply_theme(UiTheme.create())
 	# La moneda dorada (z alto) debe recibir el clic antes que lo que tenga debajo.
 	get_viewport().physics_object_picking_sort = true
@@ -137,11 +144,16 @@ func _ready() -> void:
 	hud.boost_pressed.connect(_buy_boost)
 	hud.menu_pressed.connect(menu.open)
 	menu.game = self
+	desktop = DesktopMode.new()
+	desktop.game = self
+	add_child(desktop)
 
 	_golden_timer = randf_range(GOLDEN_FIRST_DELAY.x, GOLDEN_FIRST_DELAY.y)
 	_event_timer = randf_range(EVENT_FIRST_DELAY.x, EVENT_FIRST_DELAY.y)
 	if use_save:
 		load_game()
+	if city_states.is_empty():
+		city_states.append(_capture_city())
 	_shown_dollars = dollars
 	_rebuild_tray()
 	_refresh()
@@ -155,6 +167,7 @@ func _process(delta: float) -> void:
 		row.set_daylight(night)
 	_tick_modifiers(delta)
 	_pay_buildings(delta)
+	_advance_other_cities(delta)
 	_tick_payouts(delta)
 	_tick_combo(delta)
 
@@ -352,7 +365,7 @@ func _on_printer_pressed() -> void:
 	var value := click_value()
 	earn(value)
 	if fx_enabled:
-		_popup(get_global_mouse_position(), "+" + Fmt.small(value), GOLD, 20)
+		_popup(to_local(get_global_mouse_position()), "+" + Fmt.small(value), GOLD, 20)
 		Fx.burst(effects, printer.position + Vector2(0, 60), Fx.BILLS, 6, 200.0, 45.0)
 
 
@@ -483,9 +496,140 @@ func _reset_city() -> void:
 
 func hard_reset() -> void:
 	_resetting = true
+	desktop.set_enabled(false)
 	if FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
 	get_tree().reload_current_scene()
+
+
+# --- Varias ciudades ------------------------------------------------------------
+
+func city_title() -> String:
+	return "City %d / %d" % [active_city + 1, city_states.size()]
+
+
+func can_change_city() -> bool:
+	return not menu.visible and not hud.is_event_open() and not hud.get_node("WelcomeDialog").visible
+
+
+func add_city() -> void:
+	if not can_change_city():
+		return
+	city_states[active_city] = _capture_city()
+	active_city = city_states.size()
+	_reset_city()
+	_golden_timer = randf_range(GOLDEN_FIRST_DELAY.x, GOLDEN_FIRST_DELAY.y)
+	_event_timer = randf_range(EVENT_FIRST_DELAY.x, EVENT_FIRST_DELAY.y)
+	city_states.append(_capture_city())
+	_clear_city_effects()
+	hud.toast("City %d created. Your other cities keep producing." % (active_city + 1))
+	if use_save:
+		save_game()
+
+
+func change_city(direction: int) -> void:
+	if city_states.size() < 2 or not can_change_city():
+		return
+	city_states[active_city] = _capture_city()
+	active_city = posmod(active_city + direction, city_states.size())
+	_restore_city(city_states[active_city])
+	_clear_city_effects()
+	if use_save:
+		save_game()
+
+
+func _clear_city_effects() -> void:
+	for root in [golden_root, effects]:
+		for child in root.get_children():
+			child.queue_free()
+	for row in rows:
+		row.reset()
+	combo = 1.0
+	_since_last_click = 99.0
+	_shown_dollars = dollars
+	_refresh()
+
+
+func _capture_city() -> Dictionary:
+	var buildings: Array = []
+	for b in buttons:
+		buildings.append({"count": b.count, "upgrades": b.upgrades_bought, "timer": b.timer})
+	return {"dollars": dollars, "total_earned": total_earned, "ink_level": ink_level,
+		"boost_level": boost_level, "modifiers": modifiers.duplicate(true),
+		"payouts": payouts.duplicate(true), "buildings": buildings,
+		"golden_timer": _golden_timer, "event_timer": _event_timer, "day_time": day_time}
+
+
+func _restore_city(state: Dictionary) -> void:
+	dollars = state.get("dollars", 0.0)
+	total_earned = state.get("total_earned", 0.0)
+	ink_level = state.get("ink_level", 0)
+	boost_level = state.get("boost_level", 0)
+	modifiers.assign(state.get("modifiers", []))
+	payouts.assign(state.get("payouts", []))
+	_golden_timer = state.get("golden_timer", GOLDEN_FIRST_DELAY.x)
+	_event_timer = state.get("event_timer", EVENT_FIRST_DELAY.x)
+	day_time = state.get("day_time", 0.0)
+	var buildings: Array = state.get("buildings", [])
+	for i in buttons.size():
+		var data: Dictionary = buildings[i] if i < buildings.size() else {}
+		buttons[i].count = data.get("count", 0)
+		buttons[i].upgrades_bought = data.get("upgrades", 0)
+		buttons[i].timer = data.get("timer", 0.0)
+
+
+func _city_income(state: Dictionary, seconds := 0.0) -> float:
+	# Integra la caducidad de los bonus también cuando la ciudad no está en pantalla.
+	var duration := maxf(seconds, 0.0)
+	var cutoffs: Array[float] = [0.0, duration]
+	for m: Dictionary in state.get("modifiers", []):
+		if m.time_left > 0.0 and m.time_left < duration:
+			cutoffs.append(float(m.time_left))
+	cutoffs.sort()
+	var total := 0.0
+	for segment in range(1, cutoffs.size()):
+		var at := cutoffs[segment - 1]
+		var global_factor := (1.0 + GOLDEN_BONUS_PER_COIN * golden_coins) \
+			* (1.0 + REPUTATION_BONUS * prestige_points) \
+			* (1.0 + ACHIEVEMENT_BONUS * achievements.size())
+		var rate := 0.0
+		var buildings: Array = state.get("buildings", [])
+		for i in mini(buildings.size(), buttons.size()):
+			var b := buttons[i]
+			var data: Dictionary = buildings[i]
+			var synergy := 1.0
+			if i + 1 < buildings.size():
+				synergy += b.synergy_from_next * buildings[i + 1].count
+			var factor := 1.0
+			for m: Dictionary in state.get("modifiers", []):
+				if m.time_left > at and m.target in [GameData.TARGET_ALL, i]:
+					factor *= m.factor
+			rate += b.income_per_second * data.count * pow(2.0, b.milestone_level(data.count) + data.upgrades) * synergy * factor
+		total += rate * global_factor * (cutoffs[segment] - at)
+	return total
+
+
+func _advance_other_cities(seconds: float, efficiency := 1.0) -> float:
+	var earned := 0.0
+	for i in city_states.size():
+		if i == active_city:
+			continue
+		var state := city_states[i]
+		var amount := _city_income(state, seconds) * efficiency
+		for payout: Dictionary in state.get("payouts", []):
+			payout.time_left -= seconds
+			if payout.time_left <= 0.0:
+				amount += payout.amount
+		state.payouts = state.get("payouts", []).filter(func(p: Dictionary) -> bool: return p.time_left > 0.0)
+		for m: Dictionary in state.get("modifiers", []):
+			m.time_left -= seconds
+		state.modifiers = state.get("modifiers", []).filter(func(m: Dictionary) -> bool: return m.time_left > 0.0)
+		state.dollars += amount
+		state.total_earned += amount
+		state.day_time = fmod(float(state.get("day_time", 0.0)) + seconds, DAY_LENGTH)
+		earned += amount
+	lifetime_earned += earned
+	return earned
 
 
 # --- Logros ------------------------------------------------------------------------
@@ -696,6 +840,10 @@ func save_game() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("game", "version", SAVE_VERSION)
 	cfg.set_value("game", "saved_at", Time.get_unix_time_from_system())
+	city_states[active_city] = _capture_city()
+	cfg.set_value("world", "active_city", active_city)
+	cfg.set_value("world", "cities", city_states)
+	desktop.save_settings(cfg)
 	cfg.set_value("city", "dollars", dollars)
 	cfg.set_value("city", "total_earned", total_earned)
 	cfg.set_value("city", "ink_level", ink_level)
@@ -752,15 +900,33 @@ func load_game() -> void:
 		if cfg.has_section_key("volume", bus):
 			set_volume(bus, cfg.get_value("volume", bus))
 
+	if version >= 3:
+		city_states.assign(cfg.get_value("world", "cities", []))
+		if not city_states.is_empty():
+			active_city = clampi(int(cfg.get_value("world", "active_city", 0)), 0, city_states.size() - 1)
+			_restore_city(city_states[active_city])
+	desktop.restore_settings(cfg)
+
 	var saved_at: float = cfg.get_value("game", "saved_at", Time.get_unix_time_from_system())
 	var away := clampf(Time.get_unix_time_from_system() - saved_at, 0.0, OFFLINE_MAX_SECONDS)
 	if away < OFFLINE_MIN_SECONDS:
 		return
 	var efficiency := OFFLINE_EFFICIENCY_UPGRADED if has_reputation_upgrade("night_owl") else OFFLINE_EFFICIENCY
-	var offline := income_per_second() * away * efficiency
-	if offline >= 1.0:
+	# Las ciudades guardadas cobran los bonus solo durante su tiempo restante.
+	var offline := _city_income(_capture_city(), away) * efficiency
+	for m in modifiers:
+		m.time_left -= away
+	modifiers = modifiers.filter(func(m: Dictionary) -> bool: return m.time_left > 0.0)
+	for payout in payouts:
+		payout.time_left -= away
+		if payout.time_left <= 0.0:
+			offline += payout.amount
+	payouts = payouts.filter(func(p: Dictionary) -> bool: return p.time_left > 0.0)
+	var other_offline := _advance_other_cities(away, efficiency)
+	if offline > 0.0:
 		earn(offline)
-		hud.show_welcome("While you were away (%s) your city earned %s $." % [_duration(away), Fmt.money(offline)])
+	if offline + other_offline >= 1.0:
+		hud.show_welcome("While you were away (%s) your cities earned %s $." % [_duration(away), Fmt.money(offline + other_offline)])
 
 
 static func _duration(seconds: float) -> String:

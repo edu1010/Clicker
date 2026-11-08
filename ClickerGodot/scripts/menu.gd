@@ -221,7 +221,7 @@ func _build_reputation(list: VBoxContainer) -> void:
 	prestige.add_theme_font_override("font", _bold)
 	prestige.pressed.connect(func() -> void:
 		_confirm("Found a new city?",
-				"You keep reputation, achievements and golden coins, but lose your money, buildings and upgrades.",
+				"Resets only the current city: money, buildings and upgrades. Other cities and shared reputation, achievements and golden coins are kept.",
 				func() -> void:
 					game.prestige()
 					rebuild()))
@@ -355,6 +355,19 @@ func _build_stats(list: VBoxContainer) -> void:
 func _build_options(list: VBoxContainer) -> void:
 	var display := _card(list, VBoxContainer.new())
 	_label(display, "Display", "Heading")
+	var widget := CheckBox.new()
+	widget.text = "Desktop widget (Windows): drag city title, resize edges"
+	widget.focus_mode = FOCUS_NONE
+	widget.button_pressed = game.desktop.enabled
+	widget.disabled = not game.desktop.supported()
+	widget.toggled.connect(game.desktop.set_enabled)
+	display.add_child(widget)
+	var pin := CheckBox.new()
+	pin.text = "Keep widget above other windows"
+	pin.button_pressed = game.desktop.pinned
+	pin.disabled = not game.desktop.supported()
+	pin.toggled.connect(game.desktop.set_pinned)
+	display.add_child(pin)
 	var fx := CheckBox.new()
 	fx.text = "Visual effects (floating numbers, bounces, particles)"
 	fx.focus_mode = FOCUS_NONE
