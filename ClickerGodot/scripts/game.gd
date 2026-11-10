@@ -3,14 +3,32 @@ extends Node2D
 ##
 ## Economía: clic en la impresora + edificios sin límite (coste x1.15), cada uno con
 ## su ritmo de pago, hitos x2, 4 mejoras x2 y sinergia con el siguiente edificio.
-## Multiplicadores globales: monedas doradas (+2 %), Reputación (+1 %), logros (+1 %)
-## y modificadores temporales (frenesí, eventos...).
-## Prestigio: "fundar una ciudad nueva" reinicia la ciudad a cambio de Reputación.
+## Multiplicadores globales: monedas doradas (+2 % cada una, máximo +50 %), Reputación (+1 %),
+## logros (+1 %) y modificadores temporales (frenesí, eventos...).
+## Expansión: fundar otra ciudad cuesta dinero de la ciudad seleccionada (coste global creciente).
+## Prestigio: "renovar" reinicia solo la ciudad seleccionada a cambio de Reputación. El objetivo
+## se calcula con lo ganado por todo el imperio y cada ciudad cobra la parte proporcional a lo
+## que ha ganado desde su última renovación.
+## Valores elegidos por simulación: docs/INVESTIGACION_DISENO_INCREMENTALES.md, secciones 21–23.
 
 const GOLDEN_BONUS_PER_COIN := 0.02
+## Tope del bonus permanente de las monedas doradas (+50 %): sin él, el tiempo mirando
+## multiplicaba los ingresos sin límite (sección 21.1).
+const GOLDEN_BONUS_CAP := 0.5
 const REPUTATION_BONUS := 0.01
 const ACHIEVEMENT_BONUS := 0.01
-const PRESTIGE_DIVISOR := 1e5
+## Reputación objetivo = floor(∛(ganado por el imperio / PRESTIGE_DIVISOR)).
+const PRESTIGE_DIVISOR := 1e7
+const PRESTIGE_ROOT := 3.0
+
+## Fundar la ciudad n+1 cuesta FOUND_BASE_COST × FOUND_GROWTH^(n-1) (sección 23.2).
+const FOUND_BASE_COST := 250000.0
+const FOUND_GROWTH := 8.0
+
+## Modos de compra de edificios: cantidades fijas, hasta el siguiente hito o el máximo pagable.
+const BUY_NEXT_MILESTONE := -1
+const BUY_MAX := 0
+const BUY_MODES: Array[int] = [1, 10, 25, BUY_NEXT_MILESTONE, BUY_MAX]
 
 const FRENZY_MULTIPLIER := 7.0
 const FRENZY_TIME := 30.0
@@ -47,7 +65,7 @@ const BOOST_GROWTH := 10.0
 const BOOST_PER_LEVEL := 0.01
 const UPGRADE_REVEAL_FRACTION := 0.5
 
-const SAVE_VERSION := 3
+const SAVE_VERSION := 5
 const AUTOSAVE_TIME := 10.0
 const OFFLINE_EFFICIENCY := 0.5
 const OFFLINE_EFFICIENCY_UPGRADED := 0.75
@@ -77,12 +95,18 @@ var boost_level := 0
 ## {target, factor, time_left, duration, label}. time_left = INF -> dura toda la ciudad.
 var modifiers: Array[Dictionary] = []
 var payouts: Array[Dictionary] = []
+## Ganado por esta ciudad desde su fundación (no se reinicia al renovarla).
+var city_lifetime := 0.0
+## Valor de city_lifetime en la última renovación: lo ganado después aún no se ha cobrado.
+var city_claimed_life := 0.0
 
 # Permanente.
 var lifetime_earned := 0.0
 var prestige_points := 0
 var chips := 0
-var cities := 0
+## Veces que se ha renovado una ciudad (prestigio). No confundir con city_states.size().
+var renewals := 0
+var buy_mode := 0
 var reputation_upgrades := {}
 var achievements := {}
 var golden_coins := 0
@@ -117,6 +141,7 @@ var _autosave_timer := 0.0
 var _achievement_timer := 0.0
 var _since_last_click := 99.0
 var _resetting := false
+var _last_city_earnings: Array[float] = []
 
 @onready var hud: Hud = $HUD
 @onready var menu: GameMenu = $HUD/Menu
@@ -177,7 +202,7 @@ func _process(delta: float) -> void:
 		spawn_golden_coin("red" if randf() < RED_CHANCE else "gold")
 
 	_event_timer -= delta
-	if _event_timer <= 0.0 and not hud.is_event_open():
+	if _event_timer <= 0.0 and not hud.is_modal_open():
 		_event_timer = randf_range(EVENT_DELAY.x, EVENT_DELAY.y)
 		trigger_random_event()
 
@@ -212,8 +237,12 @@ func _notification(what: int) -> void:
 
 # --- Economía -----------------------------------------------------------------
 
+func golden_bonus() -> float:
+	return minf(GOLDEN_BONUS_PER_COIN * golden_coins, GOLDEN_BONUS_CAP)
+
+
 func global_multiplier() -> float:
-	return (1.0 + GOLDEN_BONUS_PER_COIN * golden_coins) \
+	return (1.0 + golden_bonus()) \
 			* (1.0 + REPUTATION_BONUS * prestige_points) \
 			* (1.0 + ACHIEVEMENT_BONUS * achievements.size()) \
 			* modifier_factor(GameData.TARGET_ALL)
@@ -236,10 +265,11 @@ func income_per_second() -> float:
 	return total
 
 
+## Click Frenzy (TARGET_CLICK) multiplica solo el clic base, no la parte de Golden Touch
+## que depende de los $/s: así no se multiplica la producción entera por 777 (sección 22).
 func click_value() -> float:
-	var base := pow(2.0, ink_level) * global_multiplier() \
-			+ income_per_second() * BOOST_PER_LEVEL * boost_level
-	return base * modifier_factor(GameData.TARGET_CLICK) * combo
+	var base := pow(2.0, ink_level) * global_multiplier() * modifier_factor(GameData.TARGET_CLICK)
+	return (base + income_per_second() * BOOST_PER_LEVEL * boost_level) * combo
 
 
 func ink_cost() -> float:
@@ -253,6 +283,7 @@ func boost_cost() -> float:
 func earn(amount: float) -> void:
 	dollars += amount
 	total_earned += amount
+	city_lifetime += amount
 	lifetime_earned += amount
 
 
@@ -371,19 +402,57 @@ func _on_printer_pressed() -> void:
 
 # --- Compras -----------------------------------------------------------------------
 
+func buy_mode_label() -> String:
+	match BUY_MODES[buy_mode]:
+		BUY_NEXT_MILESTONE:
+			return "Buy to x2"
+		BUY_MAX:
+			return "Buy max"
+		var fixed:
+			return "Buy x%d" % fixed
+
+
+func cycle_buy_mode() -> void:
+	buy_mode = (buy_mode + 1) % BUY_MODES.size()
+	_refresh()
+
+
+## Unidades que compraría ahora un clic en ese botón según el modo elegido.
+func purchase_quantity(button: ShopButton) -> int:
+	match BUY_MODES[buy_mode]:
+		BUY_NEXT_MILESTONE:
+			return button.next_milestone() - button.count
+		BUY_MAX:
+			return maxi(1, button.affordable_count(dollars))
+		var fixed:
+			return fixed
+
+
+## $/s totales que se ganarían comprando `quantity` unidades: recalcula toda la economía,
+## así incluye hitos y la sinergia que el edificio da al anterior.
+func purchase_gain(index: int, quantity: int, income_before := -1.0) -> float:
+	var before := income_before if income_before >= 0.0 else income_per_second()
+	buttons[index].count += quantity
+	var after := income_per_second()
+	buttons[index].count -= quantity
+	return after - before
+
+
 func _on_shop_button_pressed(button: ShopButton) -> void:
 	if not button.is_unlocked(total_earned):
 		return
-	var price := button.cost()
+	var quantity := purchase_quantity(button)
+	var price := button.cost_of(quantity)
 	if dollars < price:
-		_popup(button.position + Vector2(0, 50), "Need %s $" % Fmt.money(price), RED, 14, true)
+		_popup(button.position + Vector2(0, 50), "Need %s $ more" % Fmt.money(price - dollars), RED, 14, true)
 		return
 	var level_before := button.milestone_level()
-	dollars -= price
-	button.count += 1
+	dollars = maxf(0.0, dollars - price)
+	button.count += quantity
 	if button.milestone_level() > level_before:
 		var row := rows[buttons.find(button)]
-		_popup(row.position + Vector2(295, 40), "%s x2!" % button.building_name, GOLD, 24, true)
+		var factor := 1 << (button.milestone_level() - level_before)
+		_popup(row.position + Vector2(295, 40), "%s x%d!" % [button.building_name, factor], GOLD, 24, true)
 		_confetti(row.position + Vector2(295, 40))
 	_refresh()
 
@@ -422,24 +491,74 @@ func _buy_boost() -> void:
 
 # --- Prestigio ---------------------------------------------------------------------
 
+static func reputation_level(earned: float) -> float:
+	return pow(maxf(earned, 0.0) / PRESTIGE_DIVISOR, 1.0 / PRESTIGE_ROOT)
+
+
 static func reputation_for(earned: float) -> int:
-	return floori(sqrt(maxf(earned, 0.0) / PRESTIGE_DIVISOR))
+	return floori(reputation_level(earned) + 1e-9)
 
 
+## Lo ganado por todas las ciudades desde su fundación (no baja al renovar).
+func empire_lifetime() -> float:
+	var total := city_lifetime
+	for i in city_states.size():
+		if i != active_city:
+			total += float(city_states[i].get("lifetime", 0.0))
+	return total
+
+
+## Lo ganado por todas las ciudades desde su última renovación.
+func empire_unclaimed() -> float:
+	var total := city_unclaimed()
+	for i in city_states.size():
+		if i != active_city:
+			var state := city_states[i]
+			var life := float(state.get("lifetime", 0.0))
+			total += maxf(0.0, life - float(state.get("claimed_life", life)))
+	return total
+
+
+func city_unclaimed() -> float:
+	return maxf(0.0, city_lifetime - city_claimed_life)
+
+
+## Reputación del imperio aún sin cobrar.
+func empire_pending_reputation() -> int:
+	return maxi(0, reputation_for(empire_lifetime()) - prestige_points)
+
+
+## Reputación que daría renovar la ciudad seleccionada: su parte del pendiente del imperio,
+## proporcional a lo que ha ganado desde su última renovación. Una ciudad vacía no cobra nada
+## y fundar ciudades no crea raíces nuevas.
 func pending_reputation() -> int:
-	return maxi(0, reputation_for(lifetime_earned) - prestige_points)
+	var unclaimed := empire_unclaimed()
+	if unclaimed <= 0.0:
+		return 0
+	return floori(empire_pending_reputation() * city_unclaimed() / unclaimed + 1e-9)
 
 
-## Fracción (0..1) del camino hacia el siguiente punto de Reputación.
+## Parte (0..1) del pendiente que corresponde a la ciudad seleccionada.
+func city_share() -> float:
+	var unclaimed := empire_unclaimed()
+	return city_unclaimed() / unclaimed if unclaimed > 0.0 else 0.0
+
+
+## Fracción (0..1) del camino hacia el siguiente punto de Reputación del imperio.
 func reputation_progress() -> float:
-	var level := sqrt(maxf(lifetime_earned, 0.0) / PRESTIGE_DIVISOR)
+	var level := reputation_level(empire_lifetime())
 	return level - floorf(level)
 
 
-## Dinero total que hace falta (de por vida) para el siguiente punto de Reputación.
+## Ganancias del imperio necesarias para el siguiente punto de Reputación.
 func next_reputation_at() -> float:
-	var next := reputation_for(lifetime_earned) + 1
-	return next * next * PRESTIGE_DIVISOR
+	var next := maxi(reputation_for(empire_lifetime()), prestige_points) + 1
+	return pow(next, PRESTIGE_ROOT) * PRESTIGE_DIVISOR
+
+
+## Aumento real de producción que darían `gain` puntos (+1 % directo cada uno).
+func reputation_speedup(gain: int) -> float:
+	return (1.0 + REPUTATION_BONUS * (prestige_points + gain)) / (1.0 + REPUTATION_BONUS * prestige_points) - 1.0
 
 
 func prestige() -> void:
@@ -448,9 +567,10 @@ func prestige() -> void:
 		return
 	prestige_points += gain
 	chips += gain
-	cities += 1
+	city_claimed_life = city_lifetime
+	renewals += 1
 	_reset_city()
-	hud.toast("New city founded! +%d reputation." % gain)
+	hud.toast("City %d renewed! +%d reputation." % [active_city + 1, gain])
 	for x in [250.0, 480.0, 710.0]:
 		_confetti(Vector2(x, 320))
 	if use_save:
@@ -509,22 +629,65 @@ func city_title() -> String:
 
 
 func can_change_city() -> bool:
-	return not menu.visible and not hud.is_event_open() and not hud.get_node("WelcomeDialog").visible
+	return not menu.visible and not hud.is_modal_open()
 
 
-func add_city() -> void:
+## Precio de la siguiente ciudad. Depende solo de cuántas existen en todo el imperio,
+## así es igual desde cualquier ciudad y navegar no lo abarata.
+func found_cost(existing := -1) -> float:
+	var n := city_states.size() if existing < 0 else existing
+	return roundf(FOUND_BASE_COST * pow(FOUND_GROWTH, maxi(n, 1) - 1))
+
+
+## Abre la ficha de fundación: coste, ciudad que paga, saldo resultante y qué se obtiene.
+## Solo el botón de esa ficha cobra y funda.
+func request_found_city() -> void:
 	if not can_change_city():
 		return
+	var price := found_cost()
+	var number := city_states.size() + 1
+	var lines: PackedStringArray = []
+	lines.append("Cost: %s $, paid by City %d." % [Fmt.money(price), active_city + 1])
+	if dollars >= price:
+		lines.append("Cash in City %d: %s $  →  %s $ after founding." % [active_city + 1, Fmt.money(dollars), Fmt.money(dollars - price)])
+	else:
+		lines.append("You need %s $ more in City %d." % [Fmt.money(price - dollars), active_city + 1])
+	var start: PackedStringArray = []
+	if has_reputation_upgrade("head_start"):
+		start.append("5 bars")
+	if has_reputation_upgrade("seed_money"):
+		start.append("1K $")
+	lines.append("City %d gets its own economy%s; its earnings add to your empire's reputation. Your other cities keep producing." % [
+			number, " (starts with %s)" % " and ".join(start) if not start.is_empty() else ""])
+	lines.append("The following city will cost %s $." % Fmt.money(found_cost(number)))
+	hud.confirm("Found City %d?" % number, "\n".join(lines), "Found for %s $" % Fmt.money(price),
+			dollars >= price, found_city)
+
+
+## Cobra y funda en un solo paso: sin cobros parciales ni ciudades gratis.
+func found_city() -> bool:
+	if menu.visible or hud.is_event_open():
+		return false
+	var price := found_cost()
+	if dollars < price:
+		hud.toast("You need %s $ more to found a new city." % Fmt.money(price - dollars))
+		return false
+	dollars -= price
 	city_states[active_city] = _capture_city()
 	active_city = city_states.size()
 	_reset_city()
+	city_lifetime = 0.0
+	city_claimed_life = 0.0
 	_golden_timer = randf_range(GOLDEN_FIRST_DELAY.x, GOLDEN_FIRST_DELAY.y)
 	_event_timer = randf_range(EVENT_FIRST_DELAY.x, EVENT_FIRST_DELAY.y)
 	city_states.append(_capture_city())
 	_clear_city_effects()
-	hud.toast("City %d created. Your other cities keep producing." % (active_city + 1))
+	hud.toast("City %d founded for %s $. Your other cities keep producing." % [active_city + 1, Fmt.money(price)])
+	for x in [250.0, 480.0, 710.0]:
+		_confetti(Vector2(x, 320))
 	if use_save:
 		save_game()
+	return true
 
 
 func change_city(direction: int) -> void:
@@ -555,7 +718,7 @@ func _capture_city() -> Dictionary:
 	for b in buttons:
 		buildings.append({"count": b.count, "upgrades": b.upgrades_bought, "timer": b.timer})
 	return {"dollars": dollars, "total_earned": total_earned, "ink_level": ink_level,
-		"boost_level": boost_level, "modifiers": modifiers.duplicate(true),
+		"lifetime": city_lifetime, "claimed_life": city_claimed_life, "boost_level": boost_level, "modifiers": modifiers.duplicate(true),
 		"payouts": payouts.duplicate(true), "buildings": buildings,
 		"golden_timer": _golden_timer, "event_timer": _event_timer, "day_time": day_time}
 
@@ -563,6 +726,8 @@ func _capture_city() -> Dictionary:
 func _restore_city(state: Dictionary) -> void:
 	dollars = state.get("dollars", 0.0)
 	total_earned = state.get("total_earned", 0.0)
+	city_lifetime = state.get("lifetime", total_earned)
+	city_claimed_life = state.get("claimed_life", city_lifetime)
 	ink_level = state.get("ink_level", 0)
 	boost_level = state.get("boost_level", 0)
 	modifiers.assign(state.get("modifiers", []))
@@ -589,7 +754,7 @@ func _city_income(state: Dictionary, seconds := 0.0) -> float:
 	var total := 0.0
 	for segment in range(1, cutoffs.size()):
 		var at := cutoffs[segment - 1]
-		var global_factor := (1.0 + GOLDEN_BONUS_PER_COIN * golden_coins) \
+		var global_factor := (1.0 + golden_bonus()) \
 			* (1.0 + REPUTATION_BONUS * prestige_points) \
 			* (1.0 + ACHIEVEMENT_BONUS * achievements.size())
 		var rate := 0.0
@@ -611,6 +776,8 @@ func _city_income(state: Dictionary, seconds := 0.0) -> float:
 
 func _advance_other_cities(seconds: float, efficiency := 1.0) -> float:
 	var earned := 0.0
+	_last_city_earnings.resize(city_states.size())
+	_last_city_earnings.fill(0.0)
 	for i in city_states.size():
 		if i == active_city:
 			continue
@@ -626,6 +793,8 @@ func _advance_other_cities(seconds: float, efficiency := 1.0) -> float:
 		state.modifiers = state.get("modifiers", []).filter(func(m: Dictionary) -> bool: return m.time_left > 0.0)
 		state.dollars += amount
 		state.total_earned += amount
+		state.lifetime = float(state.get("lifetime", state.total_earned - amount)) + amount
+		_last_city_earnings[i] = amount
 		state.day_time = fmod(float(state.get("day_time", 0.0)) + seconds, DAY_LENGTH)
 		earned += amount
 	lifetime_earned += earned
@@ -755,16 +924,18 @@ func _add_tray_coin(index: int) -> void:
 # --- Interfaz ---------------------------------------------------------------------
 
 func _refresh() -> void:
+	var income := income_per_second()
 	for i in buttons.size():
 		var button := buttons[i]
-		button.refresh(dollars, total_earned)
+		var quantity := purchase_quantity(button)
+		button.refresh(dollars, total_earned, quantity, purchase_gain(i, quantity, income))
 		rows[i].show_building(button, button.is_unlocked(total_earned), building_income(i))
 
 	hud.set_dollars(Fmt.money(_shown_dollars))
-	hud.set_rate(income_per_second(), modifier_factor(GameData.TARGET_ALL) > 1.0)
+	hud.set_rate(income, modifier_factor(GameData.TARGET_ALL) > 1.0)
 	hud.set_effects(modifiers)
 	hud.set_combo(combo)
-	hud.set_coins(golden_coins, GOLDEN_BONUS_PER_COIN * golden_coins)
+	hud.set_coins(golden_coins, golden_bonus(), golden_bonus() >= GOLDEN_BONUS_CAP)
 	hud.set_menu_badge(_menu_has_news())
 	_refresh_upgrade("ink", "Better Ink", "Click x2", ink_level, ink_cost())
 	_refresh_upgrade("boost", "Golden Touch", "Click +1% $/s", boost_level, boost_cost())
@@ -854,7 +1025,7 @@ func save_game() -> void:
 	for b in buttons:
 		cfg.set_value("buildings", b.name, b.count)
 		cfg.set_value("building_upgrades", b.name, b.upgrades_bought)
-	for key in ["lifetime_earned", "prestige_points", "chips", "cities", "golden_coins",
+	for key in ["lifetime_earned", "prestige_points", "chips", "renewals", "golden_coins",
 			"clicks_total", "best_ips", "time_played", "red_clicked", "best_chain",
 			"best_combo", "events_resolved"]:
 		cfg.set_value("progress", key, get(key))
@@ -882,11 +1053,14 @@ func load_game() -> void:
 	for b in buttons:
 		b.count = cfg.get_value("buildings", b.name, 0)
 		b.upgrades_bought = cfg.get_value("building_upgrades", b.name, 0)
-	for key in ["lifetime_earned", "prestige_points", "chips", "cities", "golden_coins",
+	for key in ["lifetime_earned", "prestige_points", "chips", "renewals", "golden_coins",
 			"clicks_total", "best_ips", "time_played", "red_clicked", "best_chain",
 			"best_combo", "events_resolved"]:
 		if cfg.has_section_key("progress", key):
 			set(key, cfg.get_value("progress", key))
+	if version < 4:
+		# Antes se llamaba "cities" aunque contaba prestigios.
+		renewals = cfg.get_value("progress", "cities", 0)
 	if version < 2:
 		golden_coins = cfg.get_value("game", "golden_coins", 0)
 		lifetime_earned = total_earned
@@ -905,10 +1079,13 @@ func load_game() -> void:
 		if not city_states.is_empty():
 			active_city = clampi(int(cfg.get_value("world", "active_city", 0)), 0, city_states.size() - 1)
 			_restore_city(city_states[active_city])
+	if version < 5:
+		_migrate_reputation_tracks(version)
 	desktop.restore_settings(cfg)
 
 	var saved_at: float = cfg.get_value("game", "saved_at", Time.get_unix_time_from_system())
-	var away := clampf(Time.get_unix_time_from_system() - saved_at, 0.0, OFFLINE_MAX_SECONDS)
+	var real_away := maxf(0.0, Time.get_unix_time_from_system() - saved_at)
+	var away := minf(real_away, OFFLINE_MAX_SECONDS)
 	if away < OFFLINE_MIN_SECONDS:
 		return
 	var efficiency := OFFLINE_EFFICIENCY_UPGRADED if has_reputation_upgrade("night_owl") else OFFLINE_EFFICIENCY
@@ -926,7 +1103,41 @@ func load_game() -> void:
 	if offline > 0.0:
 		earn(offline)
 	if offline + other_offline >= 1.0:
-		hud.show_welcome("While you were away (%s) your cities earned %s $." % [_duration(away), Fmt.money(offline + other_offline)])
+		var lines: PackedStringArray = []
+		lines.append("While you were away (%s) your cities earned %s $." % [_duration(real_away), Fmt.money(offline + other_offline)])
+		if city_states.size() > 1:
+			var parts: PackedStringArray = []
+			for i in city_states.size():
+				var amount := offline if i == active_city else _last_city_earnings[i]
+				parts.append("City %d: %s $" % [i + 1, Fmt.money(amount)])
+			lines.append("  ·  ".join(parts))
+		var rule := "Offline production counts at %d%%, up to %d h." % [roundi(efficiency * 100.0), roundi(OFFLINE_MAX_SECONDS / 3600.0)]
+		if real_away > OFFLINE_MAX_SECONDS:
+			rule += " Only the first %d h were counted." % roundi(OFFLINE_MAX_SECONDS / 3600.0)
+		lines.append(rule)
+		hud.show_welcome("\n".join(lines))
+
+
+## Partidas v4 o anteriores, que usaban otra fórmula de Reputación.
+## - v3 o anterior no guardaba lo ganado por ciudad: la seleccionada recibe lo que no se puede
+##   atribuir a las demás.
+## - Todo lo ganado hasta ahora se marca como ya cobrado: se conservan los puntos (sin deudas)
+##   pero no se regalan puntos nuevos al cambiar de fórmula.
+func _migrate_reputation_tracks(version: int) -> void:
+	if version < 4:
+		var others := 0.0
+		for i in city_states.size():
+			if i != active_city:
+				var state := city_states[i]
+				state.lifetime = float(state.get("total_earned", 0.0))
+				others += state.lifetime
+		city_lifetime = maxf(total_earned, lifetime_earned - others)
+	for state in city_states:
+		state.claimed_life = float(state.get("lifetime", state.get("total_earned", 0.0)))
+		state.erase("claimed")
+	city_claimed_life = city_lifetime
+	if not city_states.is_empty():
+		city_states[active_city] = _capture_city()
 
 
 static func _duration(seconds: float) -> String:

@@ -34,7 +34,8 @@ static func achievements() -> Array[Dictionary]:
 		_ach("chain_5", "Chain Reaction", "Reach a golden coin chain of 5.", func(g): return g.best_chain >= 5),
 		_ach("combo_max", "Combo Master", "Reach the maximum click combo.", func(g): return g.best_combo >= GameData.COMBO_MAX),
 		_ach("decisive", "Decisive", "Resolve 5 city events.", func(g): return g.events_resolved >= 5),
-		_ach("prestige_1", "New Beginnings", "Found a new city.", func(g): return g.cities >= 1),
+		_ach("prestige_1", "New Beginnings", "Renew a city for reputation.", func(g): return g.renewals >= 1),
+		_ach("expand_2", "Founder", "Found a second city.", func(g): return g.city_states.size() >= 2),
 		_ach("prestige_25", "Legend", "Have 25 reputation.", func(g): return g.prestige_points >= 25),
 	]
 	return list

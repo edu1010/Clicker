@@ -40,6 +40,7 @@ var timer := 0.0
 @onready var _title_label: Label = $TitleLabel
 @onready var _cost_label: Label = $CostLabel
 @onready var _info_label: Label = $InfoLabel
+@onready var _gain_label: Label = $GainLabel
 
 
 func _ready() -> void:
@@ -56,6 +57,26 @@ func _ready() -> void:
 func cost() -> float:
 	return base_cost * pow(COST_GROWTH, count)
 
+
+## Coste de comprar `quantity` unidades seguidas (serie geométrica).
+func cost_of(quantity: int) -> float:
+	if quantity <= 0:
+		return 0.0
+	return cost() * (pow(COST_GROWTH, quantity) - 1.0) / (COST_GROWTH - 1.0)
+
+
+## Cuántas unidades se pueden pagar con `dollars` (0 si ni una).
+func affordable_count(dollars: float) -> int:
+	var first := cost()
+	if dollars < first:
+		return 0
+	var amount := floori(log(dollars * (COST_GROWTH - 1.0) / first + 1.0) / log(COST_GROWTH))
+	# Corrige redondeos cerca del saldo exacto.
+	while amount > 0 and cost_of(amount) > dollars:
+		amount -= 1
+	while cost_of(amount + 1) <= dollars:
+		amount += 1
+	return amount
 
 func milestone_level(amount := count) -> int:
 	var level := 0
@@ -110,17 +131,34 @@ func is_unlocked(total_earned: float) -> bool:
 	return count > 0 or total_earned >= base_cost * REVEAL_FRACTION
 
 
-func refresh(dollars: float, total_earned: float) -> void:
+## quantity: unidades de la próxima compra. gain: $/s extra que aportaría, recalculado
+## con hitos y sinergias; junto a él se muestra la recuperación simple (precio / ganancia).
+func refresh(dollars: float, total_earned: float, quantity := 1, gain := 0.0) -> void:
 	var unlocked := is_unlocked(total_earned)
-	var affordable := dollars >= cost()
+	var price := cost_of(quantity)
+	var affordable := dollars >= price
 	input_pickable = unlocked
 	_title_label.text = title if unlocked else "???"
-	_cost_label.text = Fmt.money(cost()) + " $"
+	_cost_label.text = ("x%d · " % quantity if quantity > 1 else "") + Fmt.money(price) + " $"
 	_cost_label.modulate = Color(1.0, 0.85, 0.3) if affordable else Color(0.75, 0.75, 0.75)
 	_info_label.text = "x%d  ·  x2 at %d" % [count, next_milestone()] if unlocked else ""
+	_gain_label.visible = unlocked and gain > 0.0
+	if _gain_label.visible:
+		_gain_label.text = "+%s $/s · %s" % [Fmt.small(gain), payback_text(price / gain)]
 	if not unlocked:
 		_icon_root.modulate = Color.BLACK
 	elif affordable:
 		_icon_root.modulate = Color.WHITE
 	else:
 		_icon_root.modulate = Color(0.45, 0.45, 0.45)
+
+
+## Recuperación simple en formato corto (12s, 5m, 2.5h).
+static func payback_text(seconds: float) -> String:
+	if seconds < 10.0:
+		return "%.1fs" % seconds
+	if seconds < 60.0:
+		return "%ds" % roundi(seconds)
+	if seconds < 3600.0:
+		return "%dm" % roundi(seconds / 60.0)
+	return "%.1fh" % (seconds / 3600.0)

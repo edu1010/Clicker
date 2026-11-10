@@ -17,6 +17,7 @@ var _title: Label
 var _previous: Button
 var _next: Button
 var _new_city: Button
+var _buy_mode: Button
 var _toggle: Button
 var _pin: Button
 var _minimize: Button
@@ -51,7 +52,9 @@ func _ready() -> void:
 	_title.gui_input.connect(_drag)
 	_bar.add_child(_title)
 	_next = _button("›", "Next city", func(): game.change_city(1))
-	_new_city = _button("+", "Create an independent city (keeps all existing cities)", game.add_city)
+	_new_city = _button("+", "Found a new city", game.request_found_city)
+	_buy_mode = _button("Buy x1", "How many buildings each shop click buys", game.cycle_buy_mode)
+	_buy_mode.custom_minimum_size.x = 96
 	_toggle = _button("Widget", "Switch between desktop widget and normal window", func(): set_enabled(not enabled))
 	_toggle.custom_minimum_size.x = 100
 	_toggle.disabled = not supported()
@@ -173,8 +176,12 @@ func _process(_delta: float) -> void:
 	_previous.disabled = blocked or game.city_states.size() < 2
 	_next.disabled = _previous.disabled
 	_new_city.disabled = blocked
+	_new_city.tooltip_text = "Found City %d for %s $ (paid by this city; keeps all existing cities)" % [
+			game.city_states.size() + 1, Fmt.money(game.found_cost())]
+	_new_city.theme_type_variation = &"GoldButton" if game.dollars >= game.found_cost() else &""
+	_buy_mode.text = game.buy_mode_label()
 	# El menú y los diálogos tienen prioridad sobre los controles de la ventana.
-	_bar.visible = not game.menu.visible and not game.hud.is_event_open() and not game.hud.get_node("WelcomeDialog").visible
+	_bar.visible = not game.menu.visible and not game.hud.is_modal_open()
 
 
 func set_enabled(value: bool) -> void:

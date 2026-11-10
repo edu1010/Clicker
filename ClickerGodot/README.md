@@ -28,6 +28,10 @@ Sin límite; cada compra encarece el siguiente un 15 %. Cada tipo paga a su ritm
 - **Hitos:** con 10, 25, 50, 100, 150… edificios de un tipo, su producción se duplica.
 - **Mejoras por edificio** (Menú → Upgrades): 4 por tipo, cada una x2.
 - **Desbloqueos:** cada edificio aparece como `???` hasta que has ganado la mitad de su coste.
+- **Compras múltiples:** el botón **Buy x1** de la barra superior alterna entre ×1, ×10, ×25,
+  *hasta el siguiente hito* (`Buy to x2`) y *máximo pagable*. El precio mostrado es el de toda la compra.
+- **Comparar compras:** bajo cada edificio, en verde, se ve cuántos $/s añadiría esa compra
+  (recalculando hitos y sinergias) y en cuánto tiempo se recupera (precio ÷ ganancia).
 
 ### Monedas especiales (cada 30–75 s, duran 10 s)
 - **Dorada:** premio de 60 s de producción, frenesí x7 (30 s), clic loco x777 (10 s)
@@ -39,13 +43,16 @@ Cada 3–6 min aparece un evento con dos opciones (inspección de Hacienda, huel
 festival, inversor, turistas, apagón).
 
 ### Prestigio
-**Menú → Reputation → Found a new city.** Reinicias solo la ciudad seleccionada (dinero, edificios
-y mejoras) a cambio de **Reputación** = √(dinero ganado en total / 100.000).
+**Menú → Reputation → Renew City N.** Reinicias solo la ciudad seleccionada (dinero, edificios
+y mejoras) a cambio de **Reputación**. Cada ciudad tiene su propio contador:
+√(lo que ha ganado esa ciudad desde su fundación / 100.000) menos lo que ya reclamó.
+Así una ciudad vacía no puede cobrar la reputación que generan las demás.
+El botón indica también el aumento real de producción (de 100 a 110 puntos es +5 %, no +10 %).
 Cada punto da +1 % de ingresos para siempre y se gasta en mejoras permanentes:
 Head Start, Seed Money, Lucky Charm, Night Owl y Golden Age.
 
 ### Logros y estadísticas
-23 logros (+1 % de ingresos cada uno) y estadísticas completas en el menú.
+24 logros (+1 % de ingresos cada uno) y estadísticas completas en el menú.
 
 ### Ciudad viva
 Ciclo día/noche (4 min) con farolas, coches que aumentan con los hitos y
@@ -64,7 +71,11 @@ cielo con nubes en las calles que superan los 25 edificios.
   En la versión web el widget está deshabilitado.
 
 ### Varias ciudades
-- **+** crea una ciudad independiente sin borrar las anteriores.
+- **+** abre la ficha para **fundar** una ciudad independiente sin borrar las anteriores.
+  Cuesta dinero de la ciudad seleccionada: 250K $ la segunda, 1,25M $ la tercera, 6,25M $ la cuarta…
+  (×5 por cada ciudad existente; valores de prototipo pendientes de balance). La ficha muestra coste,
+  saldo resultante y precio de la siguiente; solo su botón cobra. El **+** se ilumina cuando puedes pagarla.
+- Fundar (comprar una ciudad) y renovar (prestigio) son acciones distintas.
 - **‹ / ›** cambia de ciudad y vuelve al principio/final al llegar al extremo.
 - Cada ciudad mantiene dinero, edificios, mejoras, efectos y pagos pendientes.
   Las demás siguen produciendo mientras juegas; los efectos temporales caducan.
@@ -72,6 +83,8 @@ cielo con nubes en las calles que superan los 25 edificios.
 - El prestigio reinicia solo la ciudad seleccionada; no afecta a las otras ciudades.
 - Los eventos con una decisión pendiente deben resolverse antes de cambiar de ciudad.
 - Las partidas anteriores se convierten automáticamente en la primera ciudad.
+  Las ciudades ya creadas se conservan sin deudas; la reputación ya cobrada en partidas antiguas
+  se reparte entre ciudades para que no pueda reclamarse dos veces.
 
 ### Opciones (Menú → Options)
 Efectos visuales, formato de números (1.23M / 1.23e6), volumen general/música/efectos
@@ -79,7 +92,8 @@ y reiniciar la partida.
 
 ### Guardado
 Automático cada 10 s y al cerrar. Al volver ganas el 50 % (75 % con Night Owl)
-de tu producción del tiempo fuera, máximo 8 h.
+de tu producción del tiempo fuera, máximo 8 h. El resumen de bienvenida desglosa lo ganado
+por ciudad y recuerda la eficiencia y el límite aplicados.
 
 ## Exportar a Windows
 Selecciona **Project → Export → Windows Desktop → Export Project**.
@@ -94,7 +108,7 @@ Ya hay un preset **Web** en `export_presets.cfg` (sin hilos, compatible con itch
 
 ## Diseño y próximas mejoras
 
-La [investigación de diseño de incrementales](docs/INVESTIGACION_DISENO_INCREMENTALES.md) reúne referencias, GDD públicos, diagnóstico del juego y propuestas de balance. Incluye el requisito de que fundar ciudades tenga coste; el cobro aún está pendiente de implementación.
+La [investigación de diseño de incrementales](docs/INVESTIGACION_DISENO_INCREMENTALES.md) reúne referencias, GDD públicos, diagnóstico del juego y propuestas de balance. La sección 20 resume qué propuestas están ya implementadas (fases 1 y 2: coste de fundación, prestigio por ciudad, compras múltiples y comparación) y cuáles siguen abiertas.
 
 ## Estructura
 | Archivo | Qué hace |
@@ -120,8 +134,16 @@ Para empezar de cero: Menú → Options → Reset game.
 
 ## Comprobaciones
 - `godot --headless --path ClickerGodot --script res://tests/test_world.gd`:
-  ciudades independientes, producción y efectos, guardado, migración y prestigio.
+  ciudades independientes, coste de fundación, compras múltiples, producción y efectos, guardado, migraciones (v2 y v3) y prestigio por ciudad.
 - `godot --path ClickerGodot --script res://tests/test_desktop.gd`:
   flags de ventana, tamaño, posición, guardado del widget y retorno a normal en Windows.
 - `godot --path ClickerGodot --script res://tests/preview_widget.gd`:
   vista interactiva con dos ciudades de prueba; no lee ni modifica tu partida.
+- `godot --headless --path ClickerGodot --script res://tools/balance_sim.gd`:
+  simulador de balance (~30 min). Bots con tres perfiles de jugador, matriz de precios de fundación
+  y prestigio; escribe `docs/SIMULACION_BALANCE.md`. Con `-- --probe=Activo,renew,found` ejecuta
+  un solo escenario en segundos. Conclusiones en la sección 21 de la investigación.
+  `-- --suite=prestige` compara fórmulas de prestigio y monedas (~20 min) y escribe
+  `docs/SIMULACION_PRESTIGIO.md`; conclusiones en la sección 22.
+  `-- --suite=empire` compara la Reputación por ciudad con la de imperio, el tope de monedas y los
+  precios de fundación (~5 min) y escribe `docs/SIMULACION_IMPERIO.md`; conclusiones en la sección 23.

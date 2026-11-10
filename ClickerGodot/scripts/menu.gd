@@ -206,7 +206,8 @@ func _build_reputation(list: VBoxContainer) -> void:
 	top.add_child(stats)
 	var rep := _stat_block(stats, "Reputation")
 	var unspent := _stat_block(stats, "Unspent")
-	var cities := _stat_block(stats, "Cities founded")
+	var cities := _stat_block(stats, "Cities")
+	var renewals := _stat_block(stats, "Renewals")
 
 	var progress_label := _label(top, "", "Muted")
 	var progress := ProgressBar.new()
@@ -220,23 +221,28 @@ func _build_reputation(list: VBoxContainer) -> void:
 	prestige.add_theme_font_size_override("font_size", 17)
 	prestige.add_theme_font_override("font", _bold)
 	prestige.pressed.connect(func() -> void:
-		_confirm("Found a new city?",
-				"Resets only the current city: money, buildings and upgrades. Other cities and shared reputation, achievements and golden coins are kept.",
+		var gain: int = game.pending_reputation()
+		_confirm("Renew City %d?" % (game.active_city + 1),
+				("Resets only City %d: money, buildings and upgrades. You get +%d reputation (production +%.1f%%). " +
+				"Other cities, reputation, achievements and golden coins are kept. Founding new cities is a separate purchase.") % [
+					game.active_city + 1, gain, game.reputation_speedup(gain) * 100.0],
 				func() -> void:
 					game.prestige()
 					rebuild()))
-	_label(top, "Reputation = √(all-time earnings / 100K). Each point gives +1% income forever.", "Muted")
+	_label(top, "Empire reputation = ∛(earnings of all your cities / 10M). Renewing a city claims the share it earned since its last renewal. Each point gives +1% income everywhere, forever.", "Muted").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	_live.append(func() -> void:
 		rep.text = "%d  (+%d%%)" % [game.prestige_points, game.prestige_points]
 		unspent.text = str(game.chips)
-		cities.text = str(game.cities)
-		var current: float = game.lifetime_earned
+		cities.text = str(game.city_states.size())
+		renewals.text = str(game.renewals)
 		progress.value = game.reputation_progress()
-		progress_label.text = "All-time earnings: %s $   ·   next reputation point at %s $" % [
-				Fmt.money(current), Fmt.money(game.next_reputation_at())]
+		progress_label.text = "Empire earnings: %s $  ·  next point at %s $  ·  unclaimed %d, City %d share %d%%" % [
+				Fmt.money(game.empire_lifetime()), Fmt.money(game.next_reputation_at()),
+				game.empire_pending_reputation(), game.active_city + 1, roundi(game.city_share() * 100.0)]
 		var pending: int = game.pending_reputation()
-		prestige.text = "Found a new city   (+%d reputation)" % pending
+		prestige.text = "Renew City %d   (+%d reputation · +%.1f%% production)" % [
+				game.active_city + 1, pending, game.reputation_speedup(pending) * 100.0]
 		prestige.disabled = pending < 1)
 
 	_section(list, "Permanent upgrades")
@@ -326,7 +332,8 @@ func _build_stats(list: VBoxContainer) -> void:
 			["Events resolved", func() -> String: return str(game.events_resolved)],
 		],
 		"Legacy": [
-			["Cities founded", func() -> String: return str(game.cities)],
+			["Cities", func() -> String: return str(game.city_states.size())],
+			["City renewals", func() -> String: return str(game.renewals)],
 			["Reputation", func() -> String: return str(game.prestige_points)],
 			["Achievements", func() -> String: return "%d / %d" % [game.achievements.size(), game.achievement_list.size()]],
 			["Time played", func() -> String: return _time(game.time_played)],

@@ -12,6 +12,8 @@ const TOAST_TIME := 2.8
 var _toasts: Array[String] = []
 var _toast_left := 0.0
 var _event_callback := Callable()
+var _theme: Theme
+var _confirm: ConfirmationDialog
 
 @onready var _dollars: Label = $DollarsLabel
 @onready var _rate: Label = $RateLabel
@@ -54,6 +56,7 @@ func _process(delta: float) -> void:
 
 ## El tema no atraviesa el CanvasLayer, así que se asigna a cada control/ventana raíz.
 func apply_theme(ui_theme: Theme) -> void:
+	_theme = ui_theme
 	for child in get_children():
 		if child is Control:
 			child.theme = ui_theme
@@ -94,8 +97,8 @@ func set_combo(value: float) -> void:
 	_combo.modulate = Color(1.0, 0.85, 0.3) if value >= GameData.COMBO_MAX else Color.WHITE
 
 
-func set_coins(amount: int, bonus: float) -> void:
-	_coins.text = "Golden coins: %d  (+%d%% income)" % [amount, roundi(bonus * 100.0)]
+func set_coins(amount: int, bonus: float, capped := false) -> void:
+	_coins.text = "Golden coins: %d  (+%d%% income%s)" % [amount, roundi(bonus * 100.0), ", max" if capped else ""]
 
 
 func set_upgrade(which: String, text: String, enabled: bool) -> void:
@@ -120,6 +123,39 @@ func show_welcome(text: String) -> void:
 
 func is_event_open() -> bool:
 	return _event.visible
+
+
+func is_confirm_open() -> bool:
+	return is_instance_valid(_confirm) and _confirm.visible
+
+
+## Cualquier ventana que deba resolverse antes de cambiar de ciudad o lanzar un evento.
+func is_modal_open() -> bool:
+	return _event.visible or _welcome.visible or is_confirm_open()
+
+
+## Ficha de confirmación (p. ej. fundar ciudad). Si can_confirm es false, el botón
+## principal aparece deshabilitado y la ficha solo informa.
+func confirm(title: String, text: String, ok_text: String, can_confirm: bool, on_ok: Callable) -> void:
+	if is_instance_valid(_confirm):
+		_confirm.queue_free()
+	var dialog := ConfirmationDialog.new()
+	dialog.title = title
+	dialog.dialog_text = text
+	dialog.dialog_autowrap = true
+	dialog.ok_button_text = ok_text
+	dialog.cancel_button_text = "Cancel"
+	dialog.size = Vector2i(500, 180)
+	dialog.theme = _theme
+	dialog.get_ok_button().theme_type_variation = &"GoldButton"
+	dialog.get_ok_button().disabled = not can_confirm
+	dialog.confirmed.connect(func() -> void: on_ok.call(), CONNECT_ONE_SHOT)
+	dialog.visibility_changed.connect(func() -> void:
+		if not dialog.visible:
+			dialog.queue_free())
+	add_child(dialog)
+	_confirm = dialog
+	dialog.popup_centered()
 
 
 ## Muestra un evento con dos opciones. callback(choice_a: bool).

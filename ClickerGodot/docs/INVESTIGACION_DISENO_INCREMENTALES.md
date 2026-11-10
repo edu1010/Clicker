@@ -6,7 +6,7 @@ Fecha: **8 de noviembre de 2026**. Investigación y preparación de diseño, ver
 
 Queremos mejorar MoneyClicker como incremental de ciudades que también pueda acompañar al jugador en una esquina del escritorio. Este documento reúne bibliografía, documentos públicos de diseño, análisis del código y propuestas que podremos convertir después en un GDD y en cambios del juego.
 
-**Requisito confirmado por el usuario: crear una ciudad nueva debe tener un coste.** El precio, la moneda y las condiciones concretas siguen pendientes de balance. Esta entrega documenta el requisito y las alternativas; no modifica todavía la economía ni añade el cobro.
+**Requisito confirmado por el usuario: crear una ciudad nueva debe tener un coste.** El precio, la moneda y las condiciones concretas siguen pendientes de balance. La versión 1 documentó el requisito y las alternativas; la sección 20 describe el cobro ya implementado.
 
 Convenciones:
 
@@ -579,3 +579,125 @@ Los GDD públicos no equivalen a consenso del sector. Tampoco se aceptan como he
 **Antes de programar:** elegir financiación, ayudas iniciales y solución al prestigio multiciudad. Después comparar la matriz de precios mediante simulación y una prueba breve de juego.
 
 **Aceptación:** el jugador explica por qué prefiere fundar o mejorar, ve cuánto paga y conserva progreso anterior al comprar o cargar partidas antiguas.
+
+## 20. Estado de implementación (10 de noviembre de 2026)
+
+Primera iteración sobre las fases 1 (coherencia) y 2 (decisiones) del plan de la sección 15. Las cifras siguen siendo candidatos de prototipo: falta la simulación de la sección 7.4 y pruebas con jugadores.
+
+### 20.1 Decisiones tomadas para el prototipo
+
+| Decisión abierta (sección 17) | Elección provisional | Motivo |
+|---|---|---|
+| ¿Financiación local o fondo común? | Dinero local de la ciudad seleccionada | Primera opción de la tabla 5.2: simple y usa la economía actual |
+| Precio de fundación | `250.000 × 5^(n − 1)`, con `n` = ciudades existentes | Candidato de la sección 5.3; constantes `FOUND_BASE_COST` y `FOUND_GROWTH` en `game.gd` |
+| ¿Prestigio local, global o hitos? | **A: prestigio local con métrica local** | Preferencia de la sección 6.1; encaja con ciudades persistentes |
+| Ayudas iniciales al fundar | Se mantienen Head Start y Seed Money | Su valor (5 bares, 1K $) es pequeño frente a 250K $; la ficha las muestra |
+
+### 20.2 Qué se ha implementado
+
+| Riesgo (sección 4.2) | Cambio |
+|---|---|
+| P0 — `add_city()` no cobraba | Sustituido por `request_found_city()` (ficha) y `found_city()` (cobro y fundación en un paso). Sin saldo no se cobra nada y se indica cuánto falta. El precio depende solo del número global de ciudades: igual desde cualquier ciudad, navegar no lo abarata y renovar no lo reduce |
+| P0 — ayudas iniciales gratis | Fundar tiene coste; la ficha detalla las ayudas recibidas |
+| P0 — prestigio con ingresos globales | Cada ciudad guarda `lifetime` (ganado desde su fundación, no se reinicia al renovar) y `claimed` (reputación ya cobrada). Pendiente = `floor(sqrt(lifetime / 100.000)) − claimed`. Una ciudad vacía ya no puede cobrar lo que generan otras |
+| P1 — `cities` contaba prestigios | Renombrado a `renewals`; «Cities» muestra `city_states.size()` |
+| P1 — dos acciones «fundan» | «Found City N» (comprar con `+`) frente a «Renew City N» (prestigio) |
+| P1 — beneficio del reinicio poco legible | El botón y la confirmación muestran el aumento relativo real (`reputation_speedup`), p. ej. +5 % de 100 a 110 puntos |
+| Sección 7.1 — compras múltiples | Modos ×1, ×10, ×25, hasta el siguiente hito y máximo, con coste geométrico exacto y corrección de redondeo cerca del saldo |
+| Sección 7.2 — comparación | Cada botón muestra el aumento real de $/s (recalcula hitos y sinergias de toda la ciudad) y la recuperación simple |
+| Sección 12 — resumen de vuelta | La bienvenida desglosa lo ganado por ciudad y explica eficiencia y límite, avisando si se superó |
+
+Logro nuevo «Founder» (fundar una segunda ciudad); «New Beginnings» pasa a premiar renovar una ciudad.
+
+### 20.3 Migración de partidas (versión de guardado 4)
+
+- Se conservan todas las ciudades; no se cobran deudas retroactivas.
+- `progress/cities` se lee como `renewals`.
+- La reputación de versiones anteriores salía de ingresos globales. Para no regalar puntos ni crear deudas: cada ciudad no seleccionada recibe `lifetime = total_earned` y se marca como reclamada su reputación correspondiente; la seleccionada recibe los ingresos históricos no atribuibles a otras y `claimed = min(reputación cobrada, su reputación)`.
+
+### 20.4 Pendiente
+
+- ~~Simular precios de fundación y recuperación tras renovar~~: hecho, ver sección 21.
+- Hipótesis a vigilar: con métrica local, la reputación total crece como la suma de raíces por ciudad, lo que incentiva fundar. El coste ×5 lo limita, pero hay que medirlo.
+- Especializaciones de ciudad (sección 8), eventos diferibles y sin pérdidas por ausencia (sección 9.2), alternativa al combo de velocidad (sección 10), automatización (fase 5).
+- Registro local de sesiones (sección 16.1).
+
+## 21. Resultados de la primera simulación (10 de noviembre de 2026)
+
+Simulador: `tools/balance_sim.gd`. Informe completo y supuestos: [SIMULACION_BALANCE.md](SIMULACION_BALANCE.md). Son bots de juego perfecto con monedas como valor esperado, sin eventos ni logros: sirven para detectar bloqueos y estrategias dominantes (sección 7.4), no para fijar tiempos reales.
+
+### 21.1 Hallazgos
+
+1. **Las monedas especiales eclipsan la economía.** Para el perfil Activo aportan el 91 % del dinero y multiplican por ~126 los $/s a las 24 h. Sin monedas, Activo (107M $/s) y Espaciado (99M $/s) quedan casi igual a las 24 h; con monedas, Activo produce unas 67 veces más a las 72 h. Contradice el pilar 4 («ausentarse sigue siendo válido») y la regla de la sección 9.2 sobre no concentrar el progreso en la moneda rara. Causas probables: +2 % permanente por moneda sin límite (unas 70 monedas por hora mirando) y Click Frenzy ×777 aplicado a un clic que, con Golden Touch, escala con los $/s. Falta separar cuánto aporta cada una.
+2. **Renovar es casi gratis y desboca la escala.** La primera renovación llega a los 2 min y la ciudad recupera su producción en 1–4 min. Con una sola ciudad, renovar cada vez que se duplica la reputación lleva a ~6·10¹¹ puntos en 72 h (multiplicador ~6·10⁹), y lo ganado pasa de 10¹⁷ a 10²⁸ $. A ese ritmo, los sufijos de `Fmt` (hasta Dc, 10³³) se agotan en pocos días. Origen: divisor de 100K muy bajo y +1 % lineal por punto sin rendimientos decrecientes; la raíz cuadrada sola no basta.
+3. **Fundar domina en todas las combinaciones de precio.** Con las 9 combinaciones de base (100K/250K/1M) y factor (3/5/8), fundar gana entre +226 % y +423 % (Activo) o entre +2.700 % y +6.000 % (Espaciado) frente a no fundar. Cada ciudad recupera su precio en 6–13 min. Se llega a 16–47 ciudades en 72 h. El precio ×5 no aguanta porque la producción crece mucho más rápido por el bucle de reputación.
+4. **Se confirma la hipótesis de la sección 20.4.** Con métrica local, cada ciudad es una raíz nueva: fundar multiplica la reputación final por ~3,7. Sin renovar, fundar solo aporta +48 % (157Qa frente a 106Qa), así que la dominancia viene sobre todo de combinar fundación y prestigio por ciudad.
+5. **No hay estrategia dominante de «comprar el último edificio».** Solo el 20–22 % de las compras de edificios son del más caro desbloqueado: hitos, mejoras y sinergias generan alternativas. Es un resultado deseable de la fase 2.
+6. **Offline:** el perfil Sesiones obtiene el 23 % de su dinero sin conexión. Entre 9 y 12 h de ausencia produce cero (límite de 8 h), y sus $/s no cambian entre la hora 1 y la 4.
+
+### 21.2 Orden de corrección propuesto
+
+1. **Prestigio primero:** sin él, cualquier precio de fundación queda desbordado. Alternativas a simular: divisor de 10⁷–10⁹, raíz cúbica (el cambio que documenta Pressure Works [R17]) o bonus por punto decreciente. Objetivo candidato: primera renovación al cabo de horas, no minutos, y recuperación medible.
+2. **Monedas después:** bonus permanente decreciente o con tope, y Click Frenzy independiente de Golden Touch. La diferencia aceptable entre juego activo y espaciado es una decisión del proyecto (sección 10); hoy es ~67×.
+3. **Fundación al final:** repetir la matriz de precios con el prestigio corregido. Si sigue dominando, revisar si cada ciudad debe tener una raíz propia o compartir una métrica de imperio con rendimientos decrecientes.
+
+Limitaciones: valor esperado continuo (suaviza la varianza de las monedas y adelanta las primeras compras), renovación instantánea y óptima, y Espaciado decide solo cada 30 min (de ahí las recuperaciones de «30 min»).
+
+## 22. Alternativas de prestigio simuladas (10 de noviembre de 2026)
+
+Suite: `tools/balance_sim.gd -- --suite=prestige`. Datos completos: [SIMULACION_PRESTIGIO.md](SIMULACION_PRESTIGIO.md). Seis fórmulas × dos perfiles × monedas actuales o corregidas (+0,5 % por moneda y Click Frenzy sin Golden Touch), con y sin fundar.
+
+### 22.1 Lectura
+
+| Fórmula | Monedas | Reputación 72 h (Activo / Espaciado) | Renovar × (Activo / Espaciado) | Recuperación (Activo / Espaciado) |
+|---|---|---:|---:|---:|
+| Actual √(ganado/100K) | actuales | 2,2·10¹² / 2,5·10⁸ | ×2,3·10¹² / ×4,7·10⁷ | 4 min / 30 min |
+| √(ganado/1B) | actuales | 2,2·10⁷ / 3.340 | ×2,2·10⁶ / ×60 | 25 min / 1,5 h |
+| ∛(ganado/10M) | actuales | 33.100 / 986 | ×2.000 / ×17 | 21 min / 1,5 h |
+| **∛(ganado/10M)** | **corregidas** | **4.100 / 416** | **×97 / ×5,3** | **17 min / 1,5 h** |
+| √(ganado/100K), +10 %·√rep | corregidas | 6,4·10⁶ / 263.000 | ×1.200 / ×150 | 9 min / 30 min |
+
+1. **Subir el divisor no basta con raíz cuadrada:** a 1B sigue habiendo millones de puntos para el Activo. La raíz cúbica es la palanca más eficaz, como en el cambio que documenta Pressure Works [R17].
+2. **Candidato recomendado: ∛(ganado / 10M) con +1 % por punto, junto con la corrección de monedas.** Renovar sigue mereciendo la pena (×5 a ×97 en 72 h), la ciudad tarda de 17 min a 1,5 h en recuperarse y la reputación queda en miles: las mejoras de Reputación (3–20 puntos) se compran pronto y conviene ampliar su catálogo.
+3. **Fundar sigue dominando con todas las fórmulas** (+846 % a +13.000 %), y más aún con las monedas corregidas, porque la base es menor. La causa es estructural: con prestigio local, cada ciudad nueva empieza una raíz desde cero. Ajustar la fórmula no lo resuelve.
+4. **Corregir las monedas a +0,5 % no basta para la ventaja activa:** el Activo sigue ganando entre ×250 y ×28.000 más que el Espaciado. Parte es inevitable (el Activo está presente 30 veces más tiempo y decide continuamente), pero 5.000 monedas × 0,5 % siguen dando ×26. Hace falta un tope al bonus permanente o eliminarlo.
+5. La primera renovación del Activo sigue llegando en minutos con todas las fórmulas, porque el valor esperado de las monedas acelera el arranque. Con monedas reales (varianza) y sin bot perfecto será más lenta; conviene medirlo en pruebas.
+
+### 22.2 Propuesta para la siguiente iteración
+
+- **Prestigio:** ∛(ganado / 10M), +1 % por punto.
+- **Métrica de imperio con reparto por ciudad**, para que fundar no regale raíces nuevas sin reabrir el exploit de la ciudad vacía:
+  `objetivo = f(Σ ganado de todas las ciudades)`; al renovar la ciudad *i*, se obtiene `(objetivo − ya reclamado) × no_reclamado_i / Σ no_reclamado`. Una ciudad vacía no tiene nada sin reclamar, y tener muchas ciudades no multiplica raíces.
+- **Monedas:** bonus permanente con tope (p. ej., +50 % en total) o sin bonus permanente; Click Frenzy sin Golden Touch.
+- Volver a simular la matriz de fundación con esos tres cambios antes de tocar `game.gd`.
+
+## 23. Reputación de imperio y tope de monedas (10 de noviembre de 2026)
+
+Suite: `tools/balance_sim.gd -- --suite=empire`. Datos completos: [SIMULACION_IMPERIO.md](SIMULACION_IMPERIO.md). Prestigio ∛(ganado/10M) con +1 % por punto y Click Frenzy sin Golden Touch en todos los casos.
+
+### 23.1 Lectura
+
+| Ámbito | Monedas | Renovar × (Activo / Espaciado) | Fundar (Activo / Espaciado) | Recuperación (Activo / Espaciado) | Activo / Espaciado |
+|---|---|---:|---:|---:|---:|
+| Ciudad | +0,5 % sin tope | ×97 / ×5,3 | +846 % / +1.850 % | 17 min / 1,5 h | ×572 |
+| Imperio | +0,5 % sin tope | ×21 / ×1,6 | +110 % / +484 % | 49 min / 2,5 h | ×423 |
+| Ciudad | +2 %, tope +50 % | ×9,4 / ×3,3 | +470 % / +1.395 % | 12 min / 1,5 h | ×4,1 |
+| **Imperio** | **+2 %, tope +50 %** | **×2,5 / ×1,4** | **+49 % / +528 %** | **51 min / 2 h** | **×2,5** |
+| Imperio | sin bonus permanente | ×2,6 / ×1,3 | +67 % / +526 % | 1,3 h / 3 h | ×2,8 |
+
+1. **El tope de monedas es lo que cierra la brecha activa:** de ×423–572 a ×2,5–4. Un bonus por moneda sin tope, aunque sea pequeño, sigue creciendo indefinidamente con el tiempo mirando. Con tope o sin bonus permanente, los resultados son parecidos (×2,5 frente a ×2,8); el tope conserva la sorpresa inicial de las monedas.
+2. **La Reputación de imperio quita la mayor parte de la ventaja de fundar** para el jugador activo (de +470 % a +49 %) y deja la renovación en un rango razonable: ×2,5 de beneficio y ~50 min de recuperación.
+3. **Para el perfil Espaciado, fundar sigue valiendo +360 % a +730 %** con cualquier precio. Ya no se debe a raíces gratis: con una sola ciudad, renovar detiene toda la producción durante horas (recuperación de 2 h y decisiones solo cada 30 min); con varias, las demás siguen produciendo. Es una ventaja legítima de expandirse y encaja con el pilar 3, pero la recuperación del precio (30–60 min, una o dos visitas) indica que la decisión sigue siendo obvia.
+4. **La expansión se detiene el primer día.** Con todos los precios simulados, las ciudades a las 24 h coinciden con las de las 72 h (8 a 15 según el factor). El precio exponencial alcanza a una producción que, ya domada, crece más despacio. El factor decide cuántas ciudades habrá (3 → ~15, 5 → ~10, 8 → ~8); la base apenas influye.
+5. **Renovar con métrica de imperio aporta poco al Espaciado (×1,3–1,6 en 72 h).** Si se quiere que renovar sea una decisión atractiva también para quien consulta poco, conviene probar un divisor menor (10⁶) o mejoras de Reputación que aceleren la recuperación (p. ej., ampliar Head Start).
+
+### 23.2 Configuración recomendada para implementar
+
+| Sistema | Valor | Motivo |
+|---|---|---|
+| Reputación | `∛(ganado del imperio / 10M)`, +1 % por punto | Escala contenida: cientos de puntos en 72 h |
+| Reparto | Pendiente del imperio proporcional a lo ganado por la ciudad desde su última renovación | Sin exploit de ciudad vacía y sin raíces gratis por fundar |
+| Monedas | +2 % por moneda con tope de +50 %; Click Frenzy sin Golden Touch | Brecha activo/espaciado ×2,5 |
+| Fundación | Base 250K, factor 8 | ~8 ciudades; menor ventaja de fundar sin eliminarla |
+
+Pendiente: dar contenido a partir del segundo día (especializaciones, sección 8; mejoras de Reputación nuevas), porque la expansión y la reputación se estabilizan pronto. También probar el divisor 10⁶ y repetir la medición con monedas aleatorias y jugadores reales.

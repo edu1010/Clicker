@@ -14,6 +14,7 @@ func _preview() -> void:
 	game.buttons[0].count = 12
 	game.buttons[1].count = 3
 	game.buttons[2].count = 1
-	game.add_city()
+	game.dollars += game.found_cost()
+	game.found_city()
 	game.change_city(-1)
 
