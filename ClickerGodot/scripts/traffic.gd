@@ -2,7 +2,7 @@ class_name Traffic
 extends Node2D
 ## Coches que circulan por la calle y farolas que se encienden de noche.
 
-const WIDTH := 590.0
+const WIDTH := 576.0
 const MARGIN := 20.0
 const LANE_Y: Array[float] = [64.0, 69.0]
 const LAMP_SPACING := 118.0

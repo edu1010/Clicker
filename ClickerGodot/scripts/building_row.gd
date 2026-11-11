@@ -1,6 +1,8 @@
 class_name BuildingRow
-extends Node2D
-## Una calle: dibuja hasta 5 edificios y muestra cantidad y $/s.
+extends Control
+## Una calle: dibuja hasta 5 edificios, muestra cantidad y $/s y tiene su botón de subir nivel.
+
+signal level_pressed
 
 const MAX_SPRITES := 5
 const GROUND := 62.0
@@ -24,15 +26,19 @@ var _unlocked := true
 @onready var _buildings: Node2D = $Buildings
 @onready var _traffic: Traffic = $Traffic
 @onready var _info: Label = $Info
+@onready var _level_strip: Control = $LevelStrip
+@onready var _level_label: Label = $LevelStrip/LevelLabel
+@onready var _level_button: Button = $LevelStrip/LevelButton
 
+func _ready() -> void:
+	_level_button.pressed.connect(level_pressed.emit)
 
 func _process(delta: float) -> void:
 	if _clouds.visible:
 		_clouds.region_rect.position.x = fmod(_clouds.region_rect.position.x + CLOUD_SPEED * delta,
 				_clouds.texture.get_width())
 
-
-func show_building(button: ShopButton, unlocked: bool, income: float) -> void:
+func show_building(button: ShopButton, unlocked: bool, income: float, dollars := 0.0) -> void:
 	_unlocked = unlocked
 	if unlocked:
 		_info.text = "%s x%d\n%s $/s" % [button.building_name, button.count, Fmt.small(income)]
@@ -42,14 +48,30 @@ func show_building(button: ShopButton, unlocked: bool, income: float) -> void:
 	_traffic.set_car_count(0 if button.count == 0 else mini(5, 1 + button.milestone_level()))
 	_apply_tint()
 	_sync_sprites(button)
+	_show_level(button, unlocked, dollars)
 
+func _show_level(button: ShopButton, unlocked: bool, dollars: float) -> void:
+	_level_strip.visible = unlocked
+	if not unlocked:
+		return
+	_level_label.text = "Level %d / %d   ·   income x%s" % [button.level, ShopButton.MAX_LEVEL,
+			Fmt.money(pow(2.0, button.level))]
+	if button.is_max_level():
+		_level_button.text = "MAX LEVEL"
+		_level_button.disabled = true
+	elif not button.level_ready():
+		var needed := button.next_level_requirement()
+		_level_button.text = "Buy a %s first" % button.title if needed == 1 else "Level %d needs %d %s" % [button.level + 1, needed, button.building_name]
+		_level_button.disabled = true
+	else:
+		_level_button.text = "Level %d (x2)  ·  %s $" % [button.level + 1, Fmt.money(button.next_level_cost())]
+		_level_button.disabled = dollars < button.next_level_cost()
 
 ## 0 = día, 1 = noche.
 func set_daylight(night: float) -> void:
 	_night = night
 	_traffic.night = night
 	_apply_tint()
-
 
 func _apply_tint() -> void:
 	var tint := Color.WHITE.lerp(NIGHT_TINT, _night)
@@ -59,7 +81,6 @@ func _apply_tint() -> void:
 	_clouds.modulate = tint
 	_buildings.modulate = Color.WHITE.lerp(tint, 0.6)
 
-
 ## Vacía la calle (al fundar una ciudad nueva).
 func reset() -> void:
 	for child in _buildings.get_children():
@@ -67,12 +88,10 @@ func reset() -> void:
 	_shown = 0
 	_texture = null
 
-
 ## Punto (local) donde mostrar los "+X $" de esta calle.
 func popup_point() -> Vector2:
 	var visible_count := maxi(1, mini(_shown, MAX_SPRITES))
 	return Vector2(FIRST_X + SPACING * (visible_count - 1) / 2.0, 18)
-
 
 func pulse() -> void:
 	for child: Node2D in _buildings.get_children():
@@ -87,7 +106,6 @@ func pulse() -> void:
 		tween.tween_property(child, "scale", base, 0.12)
 		child.set_meta("tween", tween)
 
-
 func _sync_sprites(button: ShopButton) -> void:
 	var texture := button.current_building_texture()
 	if texture != _texture:
@@ -99,7 +117,6 @@ func _sync_sprites(button: ShopButton) -> void:
 	while _shown < wanted:
 		_add_sprite(button, _shown)
 		_shown += 1
-
 
 func _add_sprite(button: ShopButton, index: int) -> void:
 	var node: Node2D

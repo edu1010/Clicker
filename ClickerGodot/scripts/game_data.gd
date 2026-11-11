@@ -26,7 +26,8 @@ static func achievements() -> Array[Dictionary]:
 		_ach("all_buildings", "City Planner", "Own at least one of every building.", func(g): return g.min_building_count() >= 1),
 		_ach("own_50", "Monopoly", "Own 50 of a single building.", func(g): return g.max_building_count() >= 50),
 		_ach("own_100", "Megacity", "Own 100 of a single building.", func(g): return g.max_building_count() >= 100),
-		_ach("renovator", "Renovator", "Buy 10 building upgrades in one city.", func(g): return g.building_upgrades_bought() >= 10),
+		_ach("renovator", "Renovator", "Reach 10 building levels in one city.", func(g): return g.total_levels() >= 10),
+		_ach("max_level", "Skyline", "Raise a building to level 10.", func(g): return g.buttons.any(func(b): return b.is_max_level())),
 		_ach("golden_1", "Lucky Find", "Catch a golden coin.", func(g): return g.golden_coins >= 1),
 		_ach("golden_10", "Treasure Hunter", "Catch 10 golden coins.", func(g): return g.golden_coins >= 10),
 		_ach("golden_50", "Midas", "Catch 50 golden coins.", func(g): return g.golden_coins >= 50),
@@ -37,6 +38,7 @@ static func achievements() -> Array[Dictionary]:
 		_ach("prestige_1", "New Beginnings", "Renew a city for reputation.", func(g): return g.renewals >= 1),
 		_ach("expand_2", "Founder", "Found a second city.", func(g): return g.city_states.size() >= 2),
 		_ach("prestige_25", "Legend", "Have 25 reputation.", func(g): return g.prestige_points >= 25),
+		_ach("conglomerate", "Conglomerate", "Buy 10 ranks in the empire tree.", func(g): return g.tree_ranks_bought() >= 10),
 	]
 	return list
 
@@ -56,6 +58,52 @@ static func reputation_upgrades() -> Array[Dictionary]:
 		{"id": "golden_age", "name": "Golden Age", "desc": "Golden coin effects last 50% longer.", "cost": 20},
 	]
 	return list
+
+
+# --- Árbol del imperio (se paga con el dinero de todas las ciudades) ---------------
+# Cada nodo: rama, nombre, rangos máximos, coste del primer rango, crecimiento por rango,
+# efecto por rango (`per`) y nodo previo (`requires`, rango 1). El texto del efecto actual
+# es `fmt % (per × rango × scale)`. Costes y efectos elegidos por simulación (sección 26).
+
+const TREE_BRANCHES := ["Commerce", "Fortune", "Hands", "Logistics"]
+
+
+static func empire_tree() -> Array[Dictionary]:
+	var list: Array[Dictionary] = [
+		_node("trade_network", "Commerce", "Trade Network", "+4% income in every city.", 5, 1e6, 8.0, 0.04, "", "+%d%% income", 100.0),
+		_node("supply_chains", "Commerce", "Supply Chains", "Synergies are 10% stronger.", 3, 1e10, 10.0, 0.1, "trade_network", "+%d%% synergy", 100.0),
+		_node("franchising", "Commerce", "Franchising", "Building levels cost 10% less.", 3, 1e14, 15.0, 0.1, "supply_chains", "-%d%% level cost", 100.0),
+		_node("global_brand", "Commerce", "Global Brand", "+20% income in every city.", 2, 1e17, 20.0, 0.2, "franchising", "+%d%% income", 100.0),
+		_node("lucky_streets", "Fortune", "Lucky Streets", "Golden coins appear 4% more often.", 5, 3e6, 8.0, 0.04, "", "+%d%% coins", 100.0),
+		_node("midas_odds", "Fortune", "Midas Odds", "+2% chance that a golden coin is a Frenzy.", 5, 3e10, 8.0, 0.02, "lucky_streets", "+%d%% Frenzy chance", 100.0),
+		_node("long_party", "Fortune", "Long Party", "Golden coin effects last 10% longer.", 3, 3e14, 15.0, 0.1, "midas_odds", "+%d%% duration", 100.0),
+		_node("golden_vault", "Fortune", "Golden Vault", "Golden coin bonus cap +10%.", 3, 3e17, 15.0, 0.1, "long_party", "cap +%d%%", 100.0),
+		_node("ergonomics", "Hands", "Ergonomics", "Max click combo +0.25.", 4, 2e6, 8.0, 0.25, "", "combo +%.2f", 1.0),
+		_node("printing_press", "Hands", "Printing Press", "Printer clicks x2.", 3, 2e10, 10.0, 1.0, "ergonomics", "clicks x%d", 1.0).merged({"exp": true}),
+		_node("lucky_press", "Hands", "Lucky Press", "Each click has a 0.05% chance to drop a golden coin.", 3, 2e14, 15.0, 0.0005, "printing_press", "%.2f%% per click", 100.0),
+		_node("open_all_night", "Logistics", "Open All Night", "+10% income while the game is open (not offline).", 2, 5e6, 10.0, 0.1, "", "+%d%% while open", 100.0),
+		_node("real_estate", "Logistics", "Real Estate", "Founding a city costs 15% less.", 3, 5e10, 10.0, 0.15, "open_all_night", "-%d%% founding", 100.0),
+		_node("heritage", "Logistics", "Heritage", "Renewing a city keeps 1 level on every building.", 2, 5e14, 20.0, 1.0, "real_estate", "keep %d levels", 1.0),
+		_node("empire_hq", "Logistics", "Empire HQ", "Each reputation point gives +0.25% more income.", 2, 5e17, 20.0, 0.0025, "heritage", "+%.2f%% per point", 100.0),
+	]
+	return list
+
+
+static func _node(id: String, branch: String, title: String, desc: String, max_rank: int, cost: float,
+		growth: float, per: float, requires: String, fmt: String, scale: float) -> Dictionary:
+	return {"id": id, "branch": branch, "name": title, "desc": desc, "max": max_rank, "cost": cost,
+		"growth": growth, "per": per, "requires": requires, "fmt": fmt, "scale": scale}
+
+
+## Coste del rango `rank + 1` de un nodo.
+static func tree_cost(node: Dictionary, rank: int, scale := 1.0) -> float:
+	return float(node.cost) * pow(float(node.growth), rank) * scale
+
+
+## Texto del efecto acumulado con `rank` rangos.
+static func tree_effect_text(node: Dictionary, rank: int) -> String:
+	var value: float = pow(2.0, rank) if node.get("exp", false) else float(node.per) * rank * float(node.scale)
+	return String(node.fmt) % (roundi(value) if String(node.fmt).contains("%d") else value)
 
 
 # --- Eventos con decisión ---------------------------------------------------------

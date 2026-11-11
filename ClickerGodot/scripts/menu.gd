@@ -1,10 +1,10 @@
 class_name GameMenu
 extends Control
-## Menú con pestañas: Upgrades, Reputation, Achievements, Stats y Options.
+## Menú con pestañas: Upgrades, Empire, Reputation, Achievements, Stats y Options.
 ## Se construye por código a partir del estado del juego (game.gd) usando
 ## las variaciones de UiTheme (tarjetas, botones de compra, títulos...).
 
-const TABS := ["Upgrades", "Reputation", "Achievements", "Stats", "Options"]
+const TABS := ["Upgrades", "Empire", "Reputation", "Achievements", "Stats", "Options"]
 const LIVE_INTERVAL := 0.25
 const PANEL_RECT := Rect2(90, 30, 780, 580)
 const ICON_SIZE := Vector2(56, 56)
@@ -107,6 +107,7 @@ func rebuild() -> void:
 	_live.append(_update_summary)
 	match current_tab_name():
 		"Upgrades": _build_upgrades(list)
+		"Empire": _build_empire(list)
 		"Reputation": _build_reputation(list)
 		"Achievements": _build_achievements(list)
 		"Stats": _build_stats(list)
@@ -128,7 +129,7 @@ func _update_summary() -> void:
 # --- Upgrades ----------------------------------------------------------------------
 
 func _build_upgrades(list: VBoxContainer) -> void:
-	_label(list, "Each upgrade doubles that building's income. Every building also boosts the previous one (synergy).", "Muted")
+	_label(list, "Each level doubles that building's income (10 levels per building, also on the streets list). Every building also boosts the previous one (synergy).", "Muted").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var any := false
 	for i in game.buttons.size():
 		var b: ShopButton = game.buttons[i]
@@ -152,7 +153,7 @@ func _build_upgrades(list: VBoxContainer) -> void:
 		pips.add_theme_constant_override("separation", 4)
 		pips.size_flags_vertical = SIZE_SHRINK_CENTER
 		title_row.add_child(pips)
-		for p in ShopButton.UPGRADE_THRESHOLDS.size():
+		for p in ShopButton.MAX_LEVEL:
 			var pip := ColorRect.new()
 			pip.custom_minimum_size = Vector2(12, 12)
 			pips.add_child(pip)
@@ -163,7 +164,7 @@ func _build_upgrades(list: VBoxContainer) -> void:
 		buy.custom_minimum_size = Vector2(120, 44)
 		buy.size_flags_vertical = SIZE_SHRINK_CENTER
 		buy.pressed.connect(func() -> void:
-			game.buy_building_upgrade(i)
+			game.level_up(i)
 			rebuild())
 		var maxed := _label(row, "MAX", "Heading")
 		maxed.custom_minimum_size.x = 120
@@ -174,18 +175,18 @@ func _build_upgrades(list: VBoxContainer) -> void:
 			title.text = "%s  x%d" % [b.building_name, b.count]
 			for p in pips.get_child_count():
 				var pip_rect: ColorRect = pips.get_child(p)
-				pip_rect.color = UiTheme.GOLD if p < b.upgrades_bought else UiTheme.TRACK
-			var more := b.has_more_upgrades()
+				pip_rect.color = UiTheme.GOLD if p < b.level else UiTheme.TRACK
+			var more := not b.is_max_level()
 			buy.visible = more
 			maxed.visible = not more
 			if not more:
-				next.text = "All upgrades bought  (income x%d)" % roundi(pow(2.0, b.upgrades_bought))
-			elif b.next_upgrade_ready():
-				next.text = "Next: %s  —  %s x2" % [b.next_upgrade_name(), b.building_name]
+				next.text = "Max level  (income x%s)" % Fmt.money(pow(2.0, b.level))
+			elif b.level_ready():
+				next.text = "Next: level %d  —  %s x2" % [b.level + 1, b.building_name]
 			else:
-				next.text = "Next: %s  —  needs %d %s" % [b.next_upgrade_name(), b.next_upgrade_threshold(), b.building_name]
-			buy.text = Fmt.money(b.next_upgrade_cost()) + " $" if more else ""
-			buy.disabled = not game.can_buy_building_upgrade(i)
+				next.text = "Next: level %d  —  needs %d %s" % [b.level + 1, b.next_level_requirement(), b.building_name]
+			buy.text = Fmt.money(b.next_level_cost()) + " $" if more else ""
+			buy.disabled = not game.can_level_up(i)
 			synergy.visible = b.synergy_from_next > 0.0 and i + 1 < game.buttons.size()
 			if synergy.visible:
 				var source: ShopButton = game.buttons[i + 1]
@@ -193,7 +194,94 @@ func _build_upgrades(list: VBoxContainer) -> void:
 						roundi(b.synergy_from_next * 100.0), roundi((game.synergy_factor(i) - 1.0) * 100.0)]
 		_live.append(update)
 	if not any:
-		_empty(list, "Buy your first building to unlock upgrades.")
+		_empty(list, "Buy your first building to unlock levels.")
+
+
+# --- Empire (árbol del imperio) ----------------------------------------------------
+
+func _build_empire(list: VBoxContainer) -> void:
+	var top := _card(list, VBoxContainer.new(), true)
+	top.add_theme_constant_override("separation", 6)
+	var stats := HBoxContainer.new()
+	stats.add_theme_constant_override("separation", 10)
+	top.add_child(stats)
+	var treasury := _stat_block(stats, "Treasury (all cities)")
+	var ranks := _stat_block(stats, "Tree ranks")
+	var breakdown := _label(top, "", "Muted")
+	breakdown.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label(top, "Empire upgrades are paid with the money of ALL your cities: each city pays in proportion to its cash. Their effects are permanent, apply to every city and survive renewals.", "Muted").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_live.append(func() -> void:
+		treasury.text = Fmt.money(game.empire_cash()) + " $"
+		ranks.text = "%d / %d" % [game.tree_ranks_bought(), game.tree_ranks_total()]
+		var parts: PackedStringArray = []
+		for i in game.city_states.size():
+			var cash: float = game.dollars if i == game.active_city else float(game.city_states[i].get("dollars", 0.0))
+			parts.append("City %d: %s $" % [i + 1, Fmt.money(cash)])
+		breakdown.text = "  ·  ".join(parts))
+
+	var grid := _grid(list)
+	for branch in GameData.TREE_BRANCHES:
+		var column := _card(grid, VBoxContainer.new())
+		column.custom_minimum_size.x = 345
+		column.add_theme_constant_override("separation", 8)
+		var heading := _label(column, branch, "Heading")
+		heading.add_theme_font_override("font", _bold)
+		for node: Dictionary in game.tree_list:
+			if node.branch == branch:
+				_tree_node(column, node)
+
+
+## Un nodo del árbol: nombre y rangos, descripción, efecto actual y botón de compra.
+func _tree_node(parent: VBoxContainer, node: Dictionary) -> void:
+	var id: String = node.id
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	parent.add_child(box)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 8)
+	box.add_child(title_row)
+	if node.requires != "":
+		_label(title_row, "↳", "Muted")
+	var title := _label(title_row, node.name)
+	title.add_theme_font_override("font", _bold)
+	title.size_flags_horizontal = SIZE_EXPAND_FILL
+	var pips := HBoxContainer.new()
+	pips.add_theme_constant_override("separation", 3)
+	pips.size_flags_vertical = SIZE_SHRINK_CENTER
+	title_row.add_child(pips)
+	for p in int(node.max):
+		var pip := ColorRect.new()
+		pip.custom_minimum_size = Vector2(10, 10)
+		pips.add_child(pip)
+	var desc := _label(box, node.desc, "Muted")
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 8)
+	box.add_child(bottom)
+	var effect := _label(bottom, "")
+	effect.size_flags_horizontal = SIZE_EXPAND_FILL
+	effect.size_flags_vertical = SIZE_SHRINK_CENTER
+	var buy := _button(bottom, "", "BuyButton")
+	buy.custom_minimum_size = Vector2(130, 34)
+	buy.pressed.connect(func() -> void:
+		game.buy_tree(id)
+		_update_live())
+	_live.append(func() -> void:
+		var rank: int = game.tree_rank(id)
+		for p in pips.get_child_count():
+			var pip_rect: ColorRect = pips.get_child(p)
+			pip_rect.color = UiTheme.GOLD if p < rank else UiTheme.TRACK
+		effect.text = "Now: " + GameData.tree_effect_text(node, rank) if rank > 0 else "Not bought"
+		effect.modulate = UiTheme.GOLD if rank > 0 else UiTheme.MUTED
+		if game.tree_maxed(id):
+			buy.text = "MAX"
+			buy.disabled = true
+		elif not game.tree_unlocked(id):
+			buy.text = "Needs %s" % game.tree_node(node.requires).name
+			buy.disabled = true
+		else:
+			buy.text = Fmt.money(game.tree_cost(id)) + " $"
+			buy.disabled = not game.can_buy_tree(id))
 
 
 # --- Reputation --------------------------------------------------------------------
@@ -232,7 +320,7 @@ func _build_reputation(list: VBoxContainer) -> void:
 	_label(top, "Empire reputation = ∛(earnings of all your cities / 10M). Renewing a city claims the share it earned since its last renewal. Each point gives +1% income everywhere, forever.", "Muted").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	_live.append(func() -> void:
-		rep.text = "%d  (+%d%%)" % [game.prestige_points, game.prestige_points]
+		rep.text = "%d  (+%d%%)" % [game.prestige_points, roundi(game.prestige_points * game.reputation_bonus() * 100.0)]
 		unspent.text = str(game.chips)
 		cities.text = str(game.city_states.size())
 		renewals.text = str(game.renewals)

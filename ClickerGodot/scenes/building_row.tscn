@@ -5,11 +5,15 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/Streets/Calle1.png" id="3_clouds"]
 [ext_resource type="Script" path="res://scripts/traffic.gd" id="4_traffic"]
 
-[node name="BuildingRow" type="Node2D"]
+[node name="BuildingRow" type="Control"]
+custom_minimum_size = Vector2(576, 108)
+layout_mode = 3
+mouse_filter = 2
 script = ExtResource("1_script")
 
 [node name="Street" type="NinePatchRect" parent="."]
-offset_right = 590.0
+layout_mode = 0
+offset_right = 576.0
 offset_bottom = 78.0
 mouse_filter = 2
 texture = ExtResource("2_street")
@@ -23,7 +27,7 @@ scale = Vector2(0.326, 0.326)
 texture = ExtResource("3_clouds")
 centered = false
 region_enabled = true
-region_rect = Rect2(0, 0, 1810, 190)
+region_rect = Rect2(0, 0, 1767, 190)
 
 [node name="Buildings" type="Node2D" parent="."]
 
@@ -31,9 +35,10 @@ region_rect = Rect2(0, 0, 1810, 190)
 script = ExtResource("4_traffic")
 
 [node name="Info" type="Label" parent="."]
-offset_left = 440.0
+layout_mode = 0
+offset_left = 426.0
 offset_top = 4.0
-offset_right = 582.0
+offset_right = 568.0
 offset_bottom = 58.0
 mouse_filter = 2
 theme_override_colors/font_outline_color = Color(0.15, 0.2, 0.25, 1)
@@ -42,3 +47,31 @@ theme_override_font_sizes/font_size = 13
 text = "???"
 horizontal_alignment = 2
 vertical_alignment = 1
+
+[node name="LevelStrip" type="ColorRect" parent="."]
+layout_mode = 0
+offset_top = 78.0
+offset_right = 576.0
+offset_bottom = 108.0
+mouse_filter = 2
+color = Color(0.27, 0.27, 0.29, 1)
+
+[node name="LevelLabel" type="Label" parent="LevelStrip"]
+layout_mode = 0
+offset_left = 10.0
+offset_right = 300.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 13
+text = "Level 0 / 10"
+vertical_alignment = 1
+
+[node name="LevelButton" type="Button" parent="LevelStrip"]
+layout_mode = 0
+offset_left = 304.0
+offset_top = 3.0
+offset_right = 570.0
+offset_bottom = 27.0
+theme_type_variation = &"BuyButton"
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "Level up"

@@ -26,7 +26,13 @@ Sin límite; cada compra encarece el siguiente un 15 %. Cada tipo paga a su ritm
 | Casino *(placeholder)* | 160.000 | 1.400 | 15 s | — |
 
 - **Hitos:** con 10, 25, 50, 100, 150… edificios de un tipo, su producción se duplica.
-- **Mejoras por edificio** (Menú → Upgrades): 4 por tipo, cada una x2.
+- **Niveles:** cada edificio tiene 10 niveles y cada uno duplica su producción. Las calles forman
+  una lista con scroll (rueda del ratón o barra lateral); cada calle tiene su botón de subir nivel con el
+  precio, o el requisito pendiente (1, 10, 25, 50, 75, 100, 125, 150, 200 y 250 edificios de ese tipo).
+  Encima de la lista, **Level up all** sube un nivel a todos los que pueden y muestra el coste total;
+  solo compra si alcanza para todos. Coste del nivel n+1: coste base × 100 × 40ⁿ (por ejemplo, bares:
+  1,5K, 60K, 2,4M…), pensado para que completar los niveles lleve días. Se reinician al renovar la ciudad.
+  También se pueden comprar desde Menú → Upgrades.
 - **Desbloqueos:** cada edificio aparece como `???` hasta que has ganado la mitad de su coste.
 - **Compras múltiples:** el botón **Buy x1** de la barra superior alterna entre ×1, ×10, ×25,
   *hasta el siguiente hito* (`Buy to x2`) y *máximo pagable*. El precio mostrado es el de toda la compra.
@@ -43,6 +49,22 @@ Sin límite; cada compra encarece el siguiente un 15 %. Cada tipo paga a su ritm
 Cada 3–6 min aparece un evento con dos opciones (inspección de Hacienda, huelga,
 festival, inversor, turistas, apagón).
 
+### Árbol del imperio
+**Menú → Empire.** Mejoras permanentes que se pagan con el dinero de **todas** las ciudades
+(cada una aporta en proporción a su saldo) y afectan a todas. No se pierden al renovar.
+Cuatro ramas de 3–4 nodos; cada nodo necesita un rango del anterior. 48 rangos en total:
+
+| Rama | Nodos (efecto por rango) |
+|------|--------------------------|
+| Commerce | Trade Network (+4 % ingresos, desde 1M $) → Supply Chains (+10 % sinergias) → Franchising (−10 % coste de niveles) → Global Brand (+20 % ingresos) |
+| Fortune | Lucky Streets (+4 % monedas doradas) → Midas Odds (+2 % de que sea Frenzy) → Long Party (+10 % duración) → Golden Vault (+10 % tope del bonus de monedas) |
+| Hands | Ergonomics (+0,25 combo máximo) → Printing Press (clic ×2) → Lucky Press (0,05 % por clic de soltar una moneda dorada) |
+| Logistics | Open All Night (+10 % con el juego abierto, no offline) → Real Estate (−15 % fundar) → Heritage (renovar conserva 1 nivel por edificio) → Empire HQ (+0,25 % por punto de Reputación) |
+
+Los costes crecen ×8–×20 por rango y dan un gran salto en cada nodo (en Commerce el primer rango
+cuesta 1M, 10B, 100T y 100Qa $),
+elegidos por simulación para que el árbol dure varios días (sección 26 de la investigación).
+
 ### Prestigio
 **Menú → Reputation → Renew City N.** Reinicias solo la ciudad seleccionada (dinero, edificios
 y mejoras) a cambio de **Reputación**. La reputación del imperio es
@@ -54,7 +76,7 @@ Cada punto da +1 % de ingresos para siempre y se gasta en mejoras permanentes:
 Head Start, Seed Money, Lucky Charm, Night Owl y Golden Age.
 
 ### Logros y estadísticas
-24 logros (+1 % de ingresos cada uno) y estadísticas completas en el menú.
+26 logros (+1 % de ingresos cada uno) y estadísticas completas en el menú.
 
 ### Ciudad viva
 Ciclo día/noche (4 min) con farolas, coches que aumentan con los hitos y
@@ -111,13 +133,13 @@ Ya hay un preset **Web** en `export_presets.cfg` (sin hilos, compatible con itch
 
 ## Diseño y próximas mejoras
 
-La [investigación de diseño de incrementales](docs/INVESTIGACION_DISENO_INCREMENTALES.md) reúne referencias, GDD públicos, diagnóstico del juego y propuestas de balance. La sección 20 resume qué propuestas están ya implementadas (fases 1 y 2: coste de fundación, prestigio por ciudad, compras múltiples y comparación) y cuáles siguen abiertas.
+La [investigación de diseño de incrementales](docs/INVESTIGACION_DISENO_INCREMENTALES.md) reúne referencias, GDD públicos, diagnóstico del juego y propuestas de balance. La sección 26 explica el árbol del imperio y por qué se mantiene la producción offline. La sección 20 resume qué propuestas están ya implementadas (fases 1 y 2: coste de fundación, prestigio por ciudad, compras múltiples y comparación) y cuáles siguen abiertas.
 
 ## Estructura
 | Archivo | Qué hace |
 |---------|----------|
 | `scripts/game.gd` | Economía, compras, prestigio, monedas, eventos, guardado |
-| `scripts/game_data.gd` | Contenido: logros, mejoras de Reputación y eventos |
+| `scripts/game_data.gd` | Contenido: logros, mejoras de Reputación, árbol del imperio y eventos |
 | `scripts/shop_button.gd` + `scenes/shop_button.tscn` | Datos de cada edificio y su botón |
 | `scripts/building_row.gd` + `scenes/building_row.tscn` | Calle: edificios, $/s, nubes, día/noche |
 | `scripts/traffic.gd` | Coches y farolas |
@@ -128,7 +150,7 @@ La [investigación de diseño de incrementales](docs/INVESTIGACION_DISENO_INCREM
 | `scripts/fx.gd`, `scripts/floating_text.gd` | Partículas y textos flotantes |
 | `scripts/clickable.gd`, `scripts/frame.gd`, `scripts/fmt.gd`, `scripts/placeholder.gd` | Utilidades |
 
-Costes, ingresos, ritmos, sinergias, nombres de mejoras, colores de placeholder y
+Costes, ingresos, ritmos, sinergias, colores de placeholder y
 sprites de cada edificio se editan desde el inspector (cada `ShopButton` en `main.tscn`).
 Para dar arte a Banco y Casino basta con asignar `button_texture` y `building_texture`.
 Para usar música real, pon un `.ogg` en el nodo `Music` y quítale el script.
@@ -137,7 +159,7 @@ Para empezar de cero: Menú → Options → Reset game.
 
 ## Comprobaciones
 - `godot --headless --path ClickerGodot --script res://tests/test_world.gd`:
-  ciudades independientes, coste de fundación, compras múltiples, producción y efectos, guardado, migraciones (v2 y v3) y prestigio por ciudad.
+  ciudades independientes, coste de fundación, compras múltiples, niveles, árbol del imperio, producción y efectos, guardado, migraciones (v2 y v3) y prestigio por ciudad.
 - `godot --path ClickerGodot --script res://tests/test_desktop.gd`:
   flags de ventana, tamaño, posición, guardado del widget y retorno a normal en Windows.
 - `godot --path ClickerGodot --script res://tests/preview_widget.gd`:
@@ -145,8 +167,12 @@ Para empezar de cero: Menú → Options → Reset game.
 - `godot --headless --path ClickerGodot --script res://tools/balance_sim.gd`:
   simulador de balance (~30 min). Bots con tres perfiles de jugador, matriz de precios de fundación
   y prestigio; escribe `docs/SIMULACION_BALANCE.md`. Con `-- --probe=Activo,renew,found` ejecuta
-  un solo escenario en segundos. Conclusiones en la sección 21 de la investigación.
+  un solo escenario en segundos (añade `,lb=100,lg=40` para probar otra curva de coste de niveles,
+  `,ts=10` para multiplicar los costes del árbol, `,off=heritage+empire_hq` para quitar nodos o `,notree`).
+  Conclusiones en la sección 21 de la investigación.
   `-- --suite=prestige` compara fórmulas de prestigio y monedas (~20 min) y escribe
   `docs/SIMULACION_PRESTIGIO.md`; conclusiones en la sección 22.
   `-- --suite=empire` compara la Reputación por ciudad con la de imperio, el tope de monedas y los
   precios de fundación (~5 min) y escribe `docs/SIMULACION_IMPERIO.md`; conclusiones en la sección 23.
+  `-- --suite=tree` mide el árbol del imperio (escala de costes, ritmo por nodo) y compara reglas de
+  producción offline frente al widget (~30 min); escribe `docs/SIMULACION_ARBOL.md`; conclusiones en la sección 26.

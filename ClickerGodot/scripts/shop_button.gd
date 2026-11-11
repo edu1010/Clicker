@@ -22,17 +22,23 @@ const REVEAL_FRACTION := 0.5
 @export var milestone_texture: Texture2D
 ## Color del placeholder cuando no hay textura.
 @export var placeholder_color := Color(0.5, 0.5, 0.5)
-## Nombres de las 4 mejoras de este edificio (cada una duplica su producción).
-@export var upgrade_names := PackedStringArray()
 ## Bonus por cada edificio del siguiente tipo (sinergia). 0.02 = +2 % por unidad.
 @export var synergy_from_next := 0.0
 
-## Edificios necesarios y multiplicador de coste (sobre base_cost) de cada mejora.
-const UPGRADE_THRESHOLDS: Array[int] = [1, 5, 25, 50]
-const UPGRADE_COST_FACTORS: Array[float] = [10.0, 50.0, 500.0, 50000.0]
+## Niveles: cada uno duplica la producción de este tipo de edificio.
+const MAX_LEVEL := 10
+## Edificios de este tipo necesarios para comprar cada nivel (1..10).
+const LEVEL_REQUIREMENTS: Array[int] = [1, 10, 25, 50, 75, 100, 125, 150, 200, 250]
+## Coste del nivel n+1 = base_cost × LEVEL_COST_BASE × LEVEL_COST_GROWTH^n. Elegido por
+## simulación para que los niveles duren días (sección 25 de la investigación).
+const LEVEL_COST_BASE := 100.0
+const LEVEL_COST_GROWTH := 40.0
+## Descuento global en el precio de los niveles (Franchising del árbol del imperio). Lo fija game.gd.
+static var level_discount := 1.0
 
 var count := 0
-var upgrades_bought := 0
+## Nivel actual (0..MAX_LEVEL). Se reinicia al renovar la ciudad.
+var level := 0
 ## Tiempo acumulado hacia el próximo pago.
 var timer := 0.0
 
@@ -96,29 +102,29 @@ func next_milestone() -> int:
 
 
 func income(multiplier: float) -> float:
-	return income_per_second * count * pow(2.0, milestone_level() + upgrades_bought) * multiplier
+	return income_per_second * count * pow(2.0, milestone_level() + level) * multiplier
 
 
-func has_more_upgrades() -> bool:
-	return upgrades_bought < UPGRADE_THRESHOLDS.size()
+## Coste de pasar de `from_level` a `from_level + 1` para un edificio de coste base `base`.
+static func level_cost_for(base: float, from_level: int) -> float:
+	return base * LEVEL_COST_BASE * pow(LEVEL_COST_GROWTH, from_level)
 
 
-func next_upgrade_name() -> String:
-	if upgrades_bought < upgrade_names.size():
-		return upgrade_names[upgrades_bought]
-	return "%s upgrade %d" % [title, upgrades_bought + 1]
+func is_max_level() -> bool:
+	return level >= MAX_LEVEL
 
 
-func next_upgrade_threshold() -> int:
-	return UPGRADE_THRESHOLDS[upgrades_bought]
+func next_level_cost() -> float:
+	return level_cost_for(base_cost, level) * level_discount
 
 
-func next_upgrade_cost() -> float:
-	return base_cost * UPGRADE_COST_FACTORS[upgrades_bought]
+func next_level_requirement() -> int:
+	return LEVEL_REQUIREMENTS[mini(level, MAX_LEVEL - 1)]
 
 
-func next_upgrade_ready() -> bool:
-	return has_more_upgrades() and count >= next_upgrade_threshold()
+## Cumple los requisitos del siguiente nivel (sin mirar el dinero).
+func level_ready() -> bool:
+	return not is_max_level() and count >= next_level_requirement()
 
 
 func current_building_texture() -> Texture2D:

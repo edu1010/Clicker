@@ -75,6 +75,8 @@ const OFFLINE_MIN_SECONDS := 60.0
 ## Duración de un ciclo día/noche en segundos.
 const DAY_LENGTH := 240.0
 const DOLLARS_LABEL_POS := Vector2(175, 86)
+## Píxeles que avanza la lista de calles por cada paso de la rueda del ratón.
+const ROW_SCROLL_STEP := 60
 const VOLUME_BUSES := ["Master", "Music", "SFX"]
 
 const GOLD := Color(1.0, 0.85, 0.3)
@@ -108,6 +110,9 @@ var chips := 0
 var renewals := 0
 var buy_mode := 0
 var reputation_upgrades := {}
+## Árbol del imperio: id de nodo -> rangos comprados. Compartido por todas las ciudades.
+var empire_tree := {}
+var tree_list: Array[Dictionary] = GameData.empire_tree()
 var achievements := {}
 var golden_coins := 0
 
@@ -149,6 +154,10 @@ var _last_city_earnings: Array[float] = []
 @onready var effects: Node2D = $Effects
 @onready var tray: Node2D = $CoinTray
 @onready var golden_root: Node2D = $GoldenCoins
+@onready var rows_scroll: ScrollContainer = $RowsScroll
+@onready var level_bar: Control = $LevelBar
+@onready var level_all_button: Button = $LevelBar/LevelAllButton
+@onready var levels_label: Label = $LevelBar/LevelsLabel
 
 
 func _ready() -> void:
@@ -162,8 +171,12 @@ func _ready() -> void:
 	for button: ShopButton in $Buttons.get_children():
 		buttons.append(button)
 		button.pressed.connect(_on_shop_button_pressed.bind(button))
-	for row: BuildingRow in $Rows.get_children():
+	rows_scroll.theme = UiTheme.create()
+	level_bar.theme = rows_scroll.theme
+	for row: BuildingRow in $RowsScroll/Rows.get_children():
+		row.level_pressed.connect(level_up.bind(rows.size()))
 		rows.append(row)
+	level_all_button.pressed.connect(level_up_all)
 	printer.pressed.connect(_on_printer_pressed)
 	hud.ink_pressed.connect(_buy_ink)
 	hud.boost_pressed.connect(_buy_boost)
@@ -175,6 +188,7 @@ func _ready() -> void:
 
 	_golden_timer = randf_range(GOLDEN_FIRST_DELAY.x, GOLDEN_FIRST_DELAY.y)
 	_event_timer = randf_range(EVENT_FIRST_DELAY.x, EVENT_FIRST_DELAY.y)
+	_apply_tree()  # el descuento de ShopButton es estático: no debe sobrevivir a un reinicio
 	if use_save:
 		load_game()
 	if city_states.is_empty():
@@ -238,20 +252,40 @@ func _notification(what: int) -> void:
 # --- Economía -----------------------------------------------------------------
 
 func golden_bonus() -> float:
-	return minf(GOLDEN_BONUS_PER_COIN * golden_coins, GOLDEN_BONUS_CAP)
+	return minf(GOLDEN_BONUS_PER_COIN * golden_coins, golden_bonus_cap())
+
+
+## Tope del bonus de monedas doradas (Golden Vault lo sube).
+func golden_bonus_cap() -> float:
+	return GOLDEN_BONUS_CAP + tree_effect("golden_vault")
+
+
+## Ingresos extra por punto de Reputación (Empire HQ lo sube).
+func reputation_bonus() -> float:
+	return REPUTATION_BONUS + tree_effect("empire_hq")
+
+
+## Multiplicadores permanentes compartidos por todas las ciudades. `live`: el juego está abierto
+## (Open All Night no cuenta para la producción offline).
+func permanent_multiplier(live := true) -> float:
+	var factor := (1.0 + golden_bonus()) \
+			* (1.0 + reputation_bonus() * prestige_points) \
+			* (1.0 + ACHIEVEMENT_BONUS * achievements.size()) \
+			* (1.0 + tree_effect("trade_network")) \
+			* (1.0 + tree_effect("global_brand"))
+	if live:
+		factor *= 1.0 + tree_effect("open_all_night")
+	return factor
 
 
 func global_multiplier() -> float:
-	return (1.0 + golden_bonus()) \
-			* (1.0 + REPUTATION_BONUS * prestige_points) \
-			* (1.0 + ACHIEVEMENT_BONUS * achievements.size()) \
-			* modifier_factor(GameData.TARGET_ALL)
+	return permanent_multiplier() * modifier_factor(GameData.TARGET_ALL)
 
 
 func synergy_factor(index: int) -> float:
 	if index + 1 >= buttons.size():
 		return 1.0
-	return 1.0 + buttons[index].synergy_from_next * buttons[index + 1].count
+	return 1.0 + buttons[index].synergy_from_next * buttons[index + 1].count * (1.0 + tree_effect("supply_chains"))
 
 
 func building_income(index: int) -> float:
@@ -268,7 +302,7 @@ func income_per_second() -> float:
 ## Click Frenzy (TARGET_CLICK) multiplica solo el clic base, no la parte de Golden Touch
 ## que depende de los $/s: así no se multiplica la producción entera por 777 (sección 22).
 func click_value() -> float:
-	var base := pow(2.0, ink_level) * global_multiplier() * modifier_factor(GameData.TARGET_CLICK)
+	var base := pow(2.0, ink_level + tree_rank("printing_press")) * global_multiplier() * modifier_factor(GameData.TARGET_CLICK)
 	return (base + income_per_second() * BOOST_PER_LEVEL * boost_level) * combo
 
 
@@ -305,13 +339,6 @@ func max_building_count() -> int:
 	return result
 
 
-func building_upgrades_bought() -> int:
-	var total := 0
-	for b in buttons:
-		total += b.upgrades_bought
-	return total
-
-
 func _pay_buildings(delta: float) -> void:
 	for i in buttons.size():
 		var button := buttons[i]
@@ -328,7 +355,8 @@ func _pay_buildings(delta: float) -> void:
 		earn(amount)
 		if fx_enabled:
 			rows[i].pulse()
-			_popup(rows[i].position + rows[i].popup_point(), "+" + Fmt.small(amount), GREEN, 15)
+			if _row_visible(i):
+				_popup(_row_point(i, rows[i].popup_point()), "+" + Fmt.small(amount), GREEN, 15)
 
 
 # --- Modificadores temporales y pagos diferidos --------------------------------
@@ -389,15 +417,23 @@ func _on_printer_pressed() -> void:
 	player.pitch_scale = randf_range(0.92, 1.08)
 	player.play()
 	if _since_last_click < COMBO_WINDOW:
-		combo = minf(GameData.COMBO_MAX, combo + COMBO_STEP)
+		combo = minf(combo_max(), combo + COMBO_STEP)
 		best_combo = maxf(best_combo, combo)
 	_since_last_click = 0.0
 	clicks_total += 1
 	var value := click_value()
 	earn(value)
+	# Lucky Press: cada clic puede soltar una moneda dorada.
+	if randf() < tree_effect("lucky_press"):
+		spawn_golden_coin("gold")
 	if fx_enabled:
 		_popup(to_local(get_global_mouse_position()), "+" + Fmt.small(value), GOLD, 20)
 		Fx.burst(effects, printer.position + Vector2(0, 60), Fx.BILLS, 6, 200.0, 45.0)
+
+
+## Combo máximo del clic (Ergonomics lo sube).
+func combo_max() -> float:
+	return GameData.COMBO_MAX + tree_effect("ergonomics")
 
 
 # --- Compras -----------------------------------------------------------------------
@@ -450,27 +486,94 @@ func _on_shop_button_pressed(button: ShopButton) -> void:
 	dollars = maxf(0.0, dollars - price)
 	button.count += quantity
 	if button.milestone_level() > level_before:
-		var row := rows[buttons.find(button)]
+		var index := buttons.find(button)
 		var factor := 1 << (button.milestone_level() - level_before)
-		_popup(row.position + Vector2(295, 40), "%s x%d!" % [button.building_name, factor], GOLD, 24, true)
-		_confetti(row.position + Vector2(295, 40))
+		_scroll_to_row(index)
+		_popup(_row_point(index, Vector2(295, 40)), "%s x%d!" % [button.building_name, factor], GOLD, 24, true)
+		_confetti(_row_point(index, Vector2(295, 40)))
 	_refresh()
 
 
-func can_buy_building_upgrade(index: int) -> bool:
+# --- Niveles de edificio -----------------------------------------------------------
+
+func can_level_up(index: int) -> bool:
 	var b := buttons[index]
-	return b.next_upgrade_ready() and dollars >= b.next_upgrade_cost()
+	return b.level_ready() and dollars >= b.next_level_cost()
 
 
-func buy_building_upgrade(index: int) -> void:
-	if not can_buy_building_upgrade(index):
-		return
+func level_up(index: int) -> bool:
+	if not can_level_up(index):
+		return false
 	var b := buttons[index]
-	dollars -= b.next_upgrade_cost()
-	hud.toast("%s bought: %s x2!" % [b.next_upgrade_name(), b.building_name])
-	b.upgrades_bought += 1
-	_confetti(rows[index].position + Vector2(200, 30))
+	dollars -= b.next_level_cost()
+	b.level += 1
+	hud.toast("%s reached level %d: income x2!" % [b.building_name, b.level])
+	_confetti(_row_point(index, Vector2(200, 30)))
 	_refresh()
+	return true
+
+
+## Edificios que ahora mismo cumplen los requisitos de su siguiente nivel.
+func levels_ready() -> Array[int]:
+	var ready: Array[int] = []
+	for i in buttons.size():
+		if buttons[i].is_unlocked(total_earned) and buttons[i].level_ready():
+			ready.append(i)
+	return ready
+
+
+## Coste de subir un nivel a todos los edificios que pueden subir.
+func level_all_cost() -> float:
+	var total := 0.0
+	for i in levels_ready():
+		total += buttons[i].next_level_cost()
+	return total
+
+
+## Sube un nivel a todos los que pueden, solo si alcanza para todos (sin compras parciales).
+func level_up_all() -> bool:
+	var ready := levels_ready()
+	var price := level_all_cost()
+	if ready.is_empty() or dollars < price:
+		return false
+	dollars -= price
+	for i in ready:
+		buttons[i].level += 1
+	hud.toast("%d buildings levelled up: income x2 each!" % ready.size())
+	for x in [250.0, 480.0, 710.0]:
+		_confetti(Vector2(x, 400))
+	_refresh()
+	return true
+
+
+func total_levels() -> int:
+	var total := 0
+	for b in buttons:
+		total += b.level
+	return total
+
+
+## Pasa un punto local de la calle `index` a coordenadas de los efectos (tiene en cuenta el scroll).
+func _row_point(index: int, local: Vector2) -> Vector2:
+	return effects.get_global_transform().affine_inverse() * (rows[index].get_global_transform() * local)
+
+
+func _row_visible(index: int) -> bool:
+	return rows_scroll.get_global_rect().intersects(rows[index].get_global_rect())
+
+
+func _scroll_to_row(index: int) -> void:
+	if not _row_visible(index):
+		rows_scroll.ensure_control_visible(rows[index])
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# La lista ignora el ratón para no tapar las monedas doradas; la rueda se gestiona aquí.
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] \
+			and rows_scroll.get_global_rect().has_point(get_global_mouse_position()):
+		rows_scroll.scroll_vertical += ROW_SCROLL_STEP * (-1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
+		get_viewport().set_input_as_handled()
 
 
 func _buy_ink() -> void:
@@ -558,7 +661,7 @@ func next_reputation_at() -> float:
 
 ## Aumento real de producción que darían `gain` puntos (+1 % directo cada uno).
 func reputation_speedup(gain: int) -> float:
-	return (1.0 + REPUTATION_BONUS * (prestige_points + gain)) / (1.0 + REPUTATION_BONUS * prestige_points) - 1.0
+	return (1.0 + reputation_bonus() * (prestige_points + gain)) / (1.0 + reputation_bonus() * prestige_points) - 1.0
 
 
 func prestige() -> void:
@@ -569,7 +672,7 @@ func prestige() -> void:
 	chips += gain
 	city_claimed_life = city_lifetime
 	renewals += 1
-	_reset_city()
+	_reset_city(tree_rank("heritage"))
 	hud.toast("City %d renewed! +%d reputation." % [active_city + 1, gain])
 	for x in [250.0, 480.0, 710.0]:
 		_confetti(Vector2(x, 320))
@@ -592,7 +695,102 @@ func buy_reputation_upgrade(id: String) -> void:
 			return
 
 
-func _reset_city() -> void:
+# --- Árbol del imperio -------------------------------------------------------------
+# Se paga con el dinero de todas las ciudades: cada una aporta en proporción a lo que tiene,
+# así ninguna se queda a cero y el reparto no depende de la ciudad seleccionada.
+
+func tree_node(id: String) -> Dictionary:
+	for node in tree_list:
+		if node.id == id:
+			return node
+	return {}
+
+
+func tree_rank(id: String) -> int:
+	return int(empire_tree.get(id, 0))
+
+
+## Efecto acumulado de un nodo: efecto por rango × rangos comprados.
+func tree_effect(id: String) -> float:
+	var rank := tree_rank(id)
+	if rank == 0:
+		return 0.0
+	return float(tree_node(id).per) * rank
+
+
+func tree_cost(id: String) -> float:
+	return GameData.tree_cost(tree_node(id), tree_rank(id))
+
+
+func tree_maxed(id: String) -> bool:
+	return tree_rank(id) >= int(tree_node(id).max)
+
+
+## El nodo previo tiene al menos un rango.
+func tree_unlocked(id: String) -> bool:
+	var requires: String = tree_node(id).requires
+	return requires == "" or tree_rank(requires) >= 1
+
+
+func can_buy_tree(id: String) -> bool:
+	return tree_unlocked(id) and not tree_maxed(id) and empire_cash() >= tree_cost(id)
+
+
+## Dinero de todas las ciudades juntas.
+func empire_cash() -> float:
+	var total := dollars
+	for i in city_states.size():
+		if i != active_city:
+			total += float(city_states[i].get("dollars", 0.0))
+	return total
+
+
+func buy_tree(id: String) -> bool:
+	if not can_buy_tree(id):
+		return false
+	var cash := empire_cash()
+	var keep := 1.0 - tree_cost(id) / cash
+	dollars = maxf(0.0, dollars * keep)
+	for i in city_states.size():
+		if i != active_city:
+			city_states[i].dollars = maxf(0.0, float(city_states[i].get("dollars", 0.0)) * keep)
+	_shown_dollars = minf(_shown_dollars, dollars)
+	empire_tree[id] = tree_rank(id) + 1
+	_apply_tree()
+	hud.toast("%s rank %d!  %s" % [tree_node(id).name, tree_rank(id), GameData.tree_effect_text(tree_node(id), tree_rank(id))])
+	_confetti(Vector2(480, 320))
+	_refresh()
+	return true
+
+
+func tree_ranks_bought() -> int:
+	var total := 0
+	for id in empire_tree:
+		total += int(empire_tree[id])
+	return total
+
+
+func tree_ranks_total() -> int:
+	var total := 0
+	for node in tree_list:
+		total += int(node.max)
+	return total
+
+
+## Aplica los efectos del árbol que viven fuera de game.gd.
+func _apply_tree() -> void:
+	ShopButton.level_discount = 1.0 - tree_effect("franchising")
+
+
+func _tree_has_news() -> bool:
+	for node in tree_list:
+		if can_buy_tree(node.id):
+			return true
+	return false
+
+
+## keep_levels: niveles que conserva cada edificio (Heritage al renovar; 0 al fundar).
+func _reset_city(keep_levels := 0) -> void:
 	dollars = 1000.0 if has_reputation_upgrade("seed_money") else 0.0
 	total_earned = 0.0
 	ink_level = 0
@@ -604,7 +802,7 @@ func _reset_city() -> void:
 		row.reset()
 	for b in buttons:
 		b.count = 0
-		b.upgrades_bought = 0
+		b.level = mini(b.level, keep_levels)
 		b.timer = 0.0
 	if has_reputation_upgrade("head_start"):
 		buttons[0].count = 5
@@ -636,7 +834,7 @@ func can_change_city() -> bool:
 ## así es igual desde cualquier ciudad y navegar no lo abarata.
 func found_cost(existing := -1) -> float:
 	var n := city_states.size() if existing < 0 else existing
-	return roundf(FOUND_BASE_COST * pow(FOUND_GROWTH, maxi(n, 1) - 1))
+	return roundf(FOUND_BASE_COST * pow(FOUND_GROWTH, maxi(n, 1) - 1) * (1.0 - tree_effect("real_estate")))
 
 
 ## Abre la ficha de fundación: coste, ciudad que paga, saldo resultante y qué se obtiene.
@@ -716,7 +914,7 @@ func _clear_city_effects() -> void:
 func _capture_city() -> Dictionary:
 	var buildings: Array = []
 	for b in buttons:
-		buildings.append({"count": b.count, "upgrades": b.upgrades_bought, "timer": b.timer})
+		buildings.append({"count": b.count, "level": b.level, "timer": b.timer})
 	return {"dollars": dollars, "total_earned": total_earned, "ink_level": ink_level,
 		"lifetime": city_lifetime, "claimed_life": city_claimed_life, "boost_level": boost_level, "modifiers": modifiers.duplicate(true),
 		"payouts": payouts.duplicate(true), "buildings": buildings,
@@ -739,11 +937,11 @@ func _restore_city(state: Dictionary) -> void:
 	for i in buttons.size():
 		var data: Dictionary = buildings[i] if i < buildings.size() else {}
 		buttons[i].count = data.get("count", 0)
-		buttons[i].upgrades_bought = data.get("upgrades", 0)
+		buttons[i].level = data.get("level", data.get("upgrades", 0))  # "upgrades": las 4 mejoras antiguas
 		buttons[i].timer = data.get("timer", 0.0)
 
 
-func _city_income(state: Dictionary, seconds := 0.0) -> float:
+func _city_income(state: Dictionary, seconds := 0.0, live := true) -> float:
 	# Integra la caducidad de los bonus también cuando la ciudad no está en pantalla.
 	var duration := maxf(seconds, 0.0)
 	var cutoffs: Array[float] = [0.0, duration]
@@ -752,11 +950,10 @@ func _city_income(state: Dictionary, seconds := 0.0) -> float:
 			cutoffs.append(float(m.time_left))
 	cutoffs.sort()
 	var total := 0.0
+	var global_factor := permanent_multiplier(live)
+	var synergy_boost := 1.0 + tree_effect("supply_chains")
 	for segment in range(1, cutoffs.size()):
 		var at := cutoffs[segment - 1]
-		var global_factor := (1.0 + golden_bonus()) \
-			* (1.0 + REPUTATION_BONUS * prestige_points) \
-			* (1.0 + ACHIEVEMENT_BONUS * achievements.size())
 		var rate := 0.0
 		var buildings: Array = state.get("buildings", [])
 		for i in mini(buildings.size(), buttons.size()):
@@ -764,17 +961,17 @@ func _city_income(state: Dictionary, seconds := 0.0) -> float:
 			var data: Dictionary = buildings[i]
 			var synergy := 1.0
 			if i + 1 < buildings.size():
-				synergy += b.synergy_from_next * buildings[i + 1].count
+				synergy += b.synergy_from_next * buildings[i + 1].count * synergy_boost
 			var factor := 1.0
 			for m: Dictionary in state.get("modifiers", []):
 				if m.time_left > at and m.target in [GameData.TARGET_ALL, i]:
 					factor *= m.factor
-			rate += b.income_per_second * data.count * pow(2.0, b.milestone_level(data.count) + data.upgrades) * synergy * factor
+			rate += b.income_per_second * data.count * pow(2.0, b.milestone_level(data.count) + int(data.get("level", data.get("upgrades", 0)))) * synergy * factor
 		total += rate * global_factor * (cutoffs[segment] - at)
 	return total
 
 
-func _advance_other_cities(seconds: float, efficiency := 1.0) -> float:
+func _advance_other_cities(seconds: float, efficiency := 1.0, live := true) -> float:
 	var earned := 0.0
 	_last_city_earnings.resize(city_states.size())
 	_last_city_earnings.fill(0.0)
@@ -782,7 +979,7 @@ func _advance_other_cities(seconds: float, efficiency := 1.0) -> float:
 		if i == active_city:
 			continue
 		var state := city_states[i]
-		var amount := _city_income(state, seconds) * efficiency
+		var amount := _city_income(state, seconds, live) * efficiency
 		for payout: Dictionary in state.get("payouts", []):
 			payout.time_left -= seconds
 			if payout.time_left <= 0.0:
@@ -833,11 +1030,11 @@ func _resolve_event(choice_a: bool, event: Dictionary) -> void:
 
 func _next_golden_delay() -> float:
 	var factor := 0.7 if has_reputation_upgrade("lucky_charm") else 1.0
-	return randf_range(GOLDEN_DELAY.x, GOLDEN_DELAY.y) * factor
+	return randf_range(GOLDEN_DELAY.x, GOLDEN_DELAY.y) * factor / (1.0 + tree_effect("lucky_streets"))
 
 
 func _effect_duration(seconds: float) -> float:
-	return seconds * (1.5 if has_reputation_upgrade("golden_age") else 1.0)
+	return seconds * (1.5 if has_reputation_upgrade("golden_age") else 1.0) * (1.0 + tree_effect("long_party"))
 
 
 func spawn_golden_coin(kind := "gold", chain := 0) -> GoldenCoin:
@@ -870,7 +1067,8 @@ func _on_golden_collected(coin: GoldenCoin) -> void:
 
 func _golden_reward(at: Vector2) -> void:
 	var roll := randf()
-	if roll < 0.4:
+	# Midas Odds pasa probabilidad de Lucky (40 %) a Frenzy (35 %).
+	if roll < 0.4 - tree_effect("midas_odds"):
 		var amount := maxf(LUCKY_MIN, income_per_second() * LUCKY_SECONDS)
 		earn(amount)
 		_popup(at, "Lucky! +%s $" % Fmt.money(amount), GOLD, 22, true)
@@ -929,21 +1127,24 @@ func _refresh() -> void:
 		var button := buttons[i]
 		var quantity := purchase_quantity(button)
 		button.refresh(dollars, total_earned, quantity, purchase_gain(i, quantity, income))
-		rows[i].show_building(button, button.is_unlocked(total_earned), building_income(i))
+		rows[i].show_building(button, button.is_unlocked(total_earned), building_income(i), dollars)
 
 	hud.set_dollars(Fmt.money(_shown_dollars))
 	hud.set_rate(income, modifier_factor(GameData.TARGET_ALL) > 1.0)
 	hud.set_effects(modifiers)
 	hud.set_combo(combo)
-	hud.set_coins(golden_coins, golden_bonus(), golden_bonus() >= GOLDEN_BONUS_CAP)
+	hud.set_coins(golden_coins, golden_bonus(), golden_bonus() >= golden_bonus_cap())
 	hud.set_menu_badge(_menu_has_news())
 	_refresh_upgrade("ink", "Better Ink", "Click x2", ink_level, ink_cost())
 	_refresh_upgrade("boost", "Golden Touch", "Click +1% $/s", boost_level, boost_cost())
+	_refresh_levels()
 
 
 func _menu_has_news() -> bool:
+	if _tree_has_news():
+		return true
 	for i in buttons.size():
-		if can_buy_building_upgrade(i):
+		if can_level_up(i):
 			return true
 	# Avisa de prestigio cuando ganarías al menos la mitad de lo que ya tienes.
 	if pending_reputation() >= maxi(1, floori(prestige_points / 2.0)):
@@ -1024,12 +1225,13 @@ func save_game() -> void:
 			func(m: Dictionary) -> Array: return [m.target, m.factor, m.label]))
 	for b in buttons:
 		cfg.set_value("buildings", b.name, b.count)
-		cfg.set_value("building_upgrades", b.name, b.upgrades_bought)
+		cfg.set_value("building_upgrades", b.name, b.level)
 	for key in ["lifetime_earned", "prestige_points", "chips", "renewals", "golden_coins",
 			"clicks_total", "best_ips", "time_played", "red_clicked", "best_chain",
 			"best_combo", "events_resolved"]:
 		cfg.set_value("progress", key, get(key))
 	cfg.set_value("progress", "reputation_upgrades", reputation_upgrades.keys())
+	cfg.set_value("progress", "empire_tree", empire_tree)
 	cfg.set_value("progress", "achievements", achievements.keys())
 	cfg.set_value("settings", "fx_enabled", fx_enabled)
 	cfg.set_value("settings", "scientific", Fmt.scientific)
@@ -1052,7 +1254,7 @@ func load_game() -> void:
 		add_modifier(m[0], m[1], INF, m[2])
 	for b in buttons:
 		b.count = cfg.get_value("buildings", b.name, 0)
-		b.upgrades_bought = cfg.get_value("building_upgrades", b.name, 0)
+		b.level = cfg.get_value("building_upgrades", b.name, 0)
 	for key in ["lifetime_earned", "prestige_points", "chips", "renewals", "golden_coins",
 			"clicks_total", "best_ips", "time_played", "red_clicked", "best_chain",
 			"best_combo", "events_resolved"]:
@@ -1066,6 +1268,11 @@ func load_game() -> void:
 		lifetime_earned = total_earned
 	for id in cfg.get_value("progress", "reputation_upgrades", []):
 		reputation_upgrades[id] = true
+	var saved_tree: Dictionary = cfg.get_value("progress", "empire_tree", {})
+	for id in saved_tree:
+		if not tree_node(id).is_empty():
+			empire_tree[id] = clampi(int(saved_tree[id]), 0, int(tree_node(id).max))
+	_apply_tree()
 	for id in cfg.get_value("progress", "achievements", []):
 		achievements[id] = true
 	fx_enabled = cfg.get_value("settings", "fx_enabled", true)
@@ -1090,7 +1297,7 @@ func load_game() -> void:
 		return
 	var efficiency := OFFLINE_EFFICIENCY_UPGRADED if has_reputation_upgrade("night_owl") else OFFLINE_EFFICIENCY
 	# Las ciudades guardadas cobran los bonus solo durante su tiempo restante.
-	var offline := _city_income(_capture_city(), away) * efficiency
+	var offline := _city_income(_capture_city(), away, false) * efficiency
 	for m in modifiers:
 		m.time_left -= away
 	modifiers = modifiers.filter(func(m: Dictionary) -> bool: return m.time_left > 0.0)
@@ -1099,7 +1306,7 @@ func load_game() -> void:
 		if payout.time_left <= 0.0:
 			offline += payout.amount
 	payouts = payouts.filter(func(p: Dictionary) -> bool: return p.time_left > 0.0)
-	var other_offline := _advance_other_cities(away, efficiency)
+	var other_offline := _advance_other_cities(away, efficiency, false)
 	if offline > 0.0:
 		earn(offline)
 	if offline + other_offline >= 1.0:
@@ -1145,3 +1352,14 @@ static func _duration(seconds: float) -> String:
 	if minutes < 60:
 		return "%d min" % minutes
 	return "%d h %d min" % [floori(minutes / 60.0), minutes % 60]
+
+
+func _refresh_levels() -> void:
+	var ready := levels_ready()
+	var price := level_all_cost()
+	levels_label.text = "Levels %d / %d" % [total_levels(), buttons.size() * ShopButton.MAX_LEVEL]
+	if ready.is_empty():
+		level_all_button.text = "Level up all  ·  nothing ready"
+	else:
+		level_all_button.text = "Level up all (%d)  ·  %s $" % [ready.size(), Fmt.money(price)]
+	level_all_button.disabled = ready.is_empty() or dollars < price

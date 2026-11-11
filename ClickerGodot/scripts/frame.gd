@@ -6,16 +6,8 @@ extends Node2D
 const SCREEN := Rect2(0, -48, 960, 688)
 const BORDER_COLOR := Color("404040")
 const PANEL_COLOR := Color("555555")
-
-const ROW_COUNT := 5
-const ROW_TOP := 210.0
-const ROW_STEP := 85.0
-const ROW_HEIGHT := 78.0
-
-
-static func row_rect(index: int) -> Rect2:
-	return Rect2(360, ROW_TOP + ROW_STEP * index, 590, ROW_HEIGHT)
-
+## Panel de las calles: barra de "subir todo" arriba y lista con scroll debajo.
+const STREETS_PANEL := Rect2(360, 210, 590, 420)
 
 var widget_mode := false
 
@@ -32,8 +24,7 @@ func _draw() -> void:
 		Rect2(10, 10, 340, 438),   # impresora
 		Rect2(10, 458, 340, 172),  # monedas
 		Rect2(360, 10, 590, 190),  # tienda
+		STREETS_PANEL,
 	]
-	for i in ROW_COUNT:
-		panels.append(row_rect(i))
 	for panel in panels:
 		draw_rect(panel, PANEL_COLOR)

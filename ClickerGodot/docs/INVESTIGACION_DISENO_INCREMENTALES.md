@@ -723,3 +723,87 @@ La configuración de la sección 23.2 está en `game.gd` (versión de guardado 5
 - **Nuevo hallazgo:** sin fundar ni renovar, una ciudad se estanca hacia las 24 h (160M $/s a las 24 h y a las 72 h). Junto con el tope de ~8 ciudades del primer día, confirma que falta contenido a partir del segundo día (sección 23.2).
 
 Las suites `prestige` y `empire` fijan las condiciones con las que se ejecutaron (monedas originales, factor 5) para que se puedan reproducir.
+
+## 25. Niveles de edificio (11 de noviembre de 2026)
+
+Petición: niveles de edificio comprables, con botón por edificio en una lista con scroll, botón de «subir todo» con el coste total, 10 niveles por edificio y mejoras caras para alargar la partida.
+
+### 25.1 Diseño implementado
+
+- **10 niveles por edificio, cada uno ×2.** Sustituyen a las 4 mejoras anteriores (también ×2); las partidas guardadas convierten sus mejoras en el mismo número de niveles, así que el multiplicador no cambia.
+- **Requisito de cantidad** para cada nivel: 1, 10, 25, 50, 75, 100, 125, 150, 200 y 250 edificios de ese tipo. Ritma los niveles junto con los hitos y da un objetivo visible («Level 4 needs 50 Bars»).
+- **Coste:** `coste base × 100 × 40^nivel` (constantes `LEVEL_COST_BASE` y `LEVEL_COST_GROWTH` en `shop_button.gd`). Bares: 1,5K, 60K, 2,4M, 96M…; casino nivel 10: ~4·10²¹ $.
+- **Interfaz:** las calles son una lista con scroll (rueda o barra lateral) y cada una tiene una franja con nivel, multiplicador y botón con precio o requisito. Encima, «Level up all (n) · X $» compra un nivel para todos los que cumplen requisitos, solo si alcanza para todos (sin compras parciales). La lista ignora los clics fuera de los botones para no tapar las monedas doradas.
+- Los niveles se reinician al renovar la ciudad, como las antiguas mejoras. Logros: «Renovator» (10 niveles en una ciudad) y el nuevo «Skyline» (un edificio a nivel 10).
+
+### 25.2 Elección del coste por simulación
+
+Sondeos con `balance_sim.gd -- --probe=Perfil,renew,found,lb=…,lg=…` (niveles en la mejor ciudad):
+
+| Curva | Activo 1 h / 24 h / 72 h | Espaciado 4 h / 24 h / 72 h |
+|---|---:|---:|
+| ×25, ×10 por nivel | 30 / 42 / 43 | 27 / 38 / 40 |
+| ×100, ×20 | 22 / 34 / 39 | 20 / 31 / 36 |
+| **×100, ×40 (elegida)** | **18 / 27 / 31** | **12 / 25 / 27** |
+| ×200, ×60 | 16 / 23 / 26 | 13 / 21 / 23 |
+
+Con ×100 y ×40 los primeros niveles llegan pronto (descubrimiento), pero completar los 50 niveles queda fuera del alcance de las primeras 72 h: es una meta de largo plazo que avanza con la Reputación.
+
+### 25.3 Efectos medidos ([SIMULACION_BALANCE.md](SIMULACION_BALANCE.md))
+
+- **Renovar cuesta más:** la ciudad renovada tarda 2,1 h (Activo), 4 h (Espaciado) u 11 h (Sesiones) en recuperar su producción, frente a 20 min / 1,5 h / 20 min sin niveles caros. Cada renovación sacrifica niveles caros, así que se convierte en una decisión de verdad y la partida dura más, como se pedía.
+- Renovar sigue valiendo la pena: ×6,8 de dinero para el Activo y ×1,4 para el Espaciado en 72 h. Para el Espaciado la ventaja es pequeña; si se quiere aumentar, una mejora de Reputación que conserve algún nivel al renovar sería una buena candidata.
+- Una ciudad sin fundar ni renovar sigue estancándose hacia las 24 h (270M $/s a las 24 y 72 h): el contenido a partir del segundo día sigue pendiente (sección 23.2).
+
+## 26. Árbol del imperio y producción offline (11 de noviembre de 2026)
+
+Petición: un árbol de mejoras que use el dinero de todas las ciudades, que empiece en torno a 1M $ y dé efectos del tipo «+1 % de probabilidad de X», diseñado y ajustado con simulaciones. Pregunta: ¿conviene que el juego siga generando con el juego cerrado?
+
+### 26.1 Diseño
+
+- **Fondo común parcial.** Responde a la decisión abierta de la sección 17 («¿financiación local o fondo común?») sin romper la economía local: las ciudades siguen teniendo su dinero, pero el árbol se paga con la suma de todas. Cada ciudad aporta en proporción a su saldo, así ninguna se queda a cero y el resultado no depende de la ciudad seleccionada. Da uso al dinero acumulado en ciudades viejas que ya no compran nada útil.
+- **Permanente y compartido.** Los efectos valen para todas las ciudades y sobreviven a las renovaciones: es una capa de progreso entre la ciudad (se reinicia) y la Reputación (global).
+- **Cuatro ramas** con identidad propia (sección 3: elecciones legibles), cada una con una cadena de 3–4 nodos (cada nodo requiere un rango del anterior). 15 nodos, 48 rangos:
+  - *Commerce* (ingresos): Trade Network, Supply Chains, Franchising, Global Brand.
+  - *Fortune* (monedas): Lucky Streets, Midas Odds, Long Party, Golden Vault.
+  - *Hands* (juego activo): Ergonomics, Printing Press, Lucky Press.
+  - *Logistics* (imperio): Open All Night, Real Estate, Heritage, Empire HQ.
+- **Efectos pequeños y acumulables** (+4 % de monedas, +2 % de probabilidad de Frenzy, 0,05 % por clic de soltar moneda…), con el valor actual visible en cada nodo.
+- **Premiar tener el juego abierto sin castigar cerrarlo:** Open All Night (+10 % por rango) solo cuenta con el juego abierto o en modo widget, no en la producción offline; Hands y Fortune solo rinden si estás mirando.
+- **Costes:** primer rango a 1M $ (Trade Network) y crecimiento ×8–×20 por rango, con un salto grande en cada nodo de la cadena (1M → 10B → 100T → 100Qa en Commerce). Datos en `GameData.empire_tree()`; logro «Conglomerate» al comprar 10 rangos.
+
+### 26.2 Ajuste por simulación ([SIMULACION_ARBOL.md](SIMULACION_ARBOL.md))
+
+El bot compara cada rango del árbol con las compras de las ciudades con la misma puntuación (`espera + coste / aumento de $/s`, aumento medido en todo el imperio, incluidos clics y monedas), así solo ahorra para el árbol cuando rinde más que un edificio o un nivel.
+
+- **Primera versión, demasiado fuerte:** con +5 % por rango, sinergias +25 % y nodos baratos, el Activo ganaba ×55–×150 en 72 h y completaba casi todo el árbol el primer día. La causa no era un solo nodo (quitar Heritage apenas cambiaba nada): cada multiplicador de ingresos alimenta la Reputación (raíz cúbica de lo ganado), que vuelve a multiplicar los ingresos. Quitar la rama Commerce reducía el efecto ×15.
+- **Versión elegida:** efectos más pequeños (el árbol completo vale ≈ ×3 en ingresos antes de la Reputación) y saltos de coste ×1.000–×10.000 entre nodos. Resultado con los costes del juego:
+
+| Perfil | 1.ª compra | Rangos 1 h / 24 h / 72 h | Ganado 72 h vs sin árbol |
+|---|---:|---:|---:|
+| Activo | 13 min | 17 / 28 / 35 de 48 | ×11 |
+| Espaciado | 3 h | 0 / 24 / 27 | ×2,9 |
+| Sesiones | 13 min | 17 / 20 / 25 | ×2,9 |
+
+- **Ritmo:** el primer nodo de cada rama llega en la primera hora jugando (descubrimiento); el segundo, en horas; el tercero, entre el día 1 y el 3; el cuarto (Global Brand, Golden Vault, Empire HQ) queda fuera de las 72 h como meta larga. Nadie completa el árbol en 72 h.
+- **La escala de costes importa poco al dinero total** (×0,1 a ×10 da ×2,7–×3 para Espaciado) pero sí al ritmo de rangos: con ×10 el Activo tiene 28 rangos a las 72 h en vez de 35. Se deja ×1: el árbol se gasta el 1–6 % de lo ganado, es un sumidero ligero que da objetivos sin frenar la economía de cada ciudad.
+- El ×11 del Activo viene sobre todo de que su Reputación da un salto más (256 → 1.024 puntos, que piden ×64 de dinero): es una cota superior de jugar 72 h seguidas a 2 clics/s, no un jugador típico.
+
+### 26.3 ¿Producción con el juego cerrado?
+
+**Por qué existe.** Es la promesa central del género: el progreso respeta tu tiempo. Sirve para tres cosas: el momento de «bienvenida» al volver (gancho para regresar), no obligar a dejar el ordenador encendido toda la noche y no castigar a quien no puede tener el juego abierto (portátil, trabajo). Sin ella, el jugador que cierra el juego siente que pierde el tiempo y abandona.
+
+**El riesgo que señala la pregunta es real**: si cerrar rinde casi como tener el widget, no hay motivo para abrirlo ni para hacer clic. La respuesta de diseño no es quitar el offline, sino que estar presente rinda claramente más. Medido con el perfil Sesiones (dos sesiones de 1 h al día) frente a las mismas sesiones dejando el widget abierto entre ellas:
+
+| Regla offline | Ganado cerrando ÷ ganado con widget | Parte del dinero que llega offline |
+|---|---:|---:|
+| Sin offline | 7 % | 0 % |
+| 25 %, 4 h | 17 % | 43 % |
+| 25 %, 8 h | 26 % | 61 % |
+| **50 %, 8 h (actual)** | **43 %** | 71 % |
+| 100 %, 8 h | 56 % | 76 % |
+| 100 %, sin límite | 84 % | 81 % |
+
+- Con la regla actual, dejar el widget abierto da **×2,3** más que cerrar; además las monedas, los clics, los eventos y Open All Night solo funcionan con el juego abierto. El widget ya está bien incentivado.
+- Quitar el offline (7 %) haría que quien apaga el ordenador gane 14 veces menos: castiga justo al jugador casual que el widget no puede retener.
+- **Recomendación:** mantener 50 % y 8 h. Si se quiere empujar más hacia el widget, la opción moderada es 25 % y 8 h (cerrar rinde ¼ del widget) y no ir por debajo. Una mejora barata y sin castigo: que el resumen de bienvenida diga cuánto habría ganado con el widget abierto, para que la ventaja se vea.

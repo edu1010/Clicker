@@ -33,6 +33,23 @@ const OLD_COINS := {"coin_bonus": 0.02, "frenzy_boost": true, "coin_cap": -1.0}
 const SUITE_FOUND_GROWTH := 5.0
 
 const EMPIRE_OUT_PATH := "res://docs/SIMULACION_IMPERIO.md"
+const TREE_OUT_PATH := "res://docs/SIMULACION_ARBOL.md"
+## Escalas de coste del árbol que compara la suite (1 = costes de GameData.empire_tree()).
+const TREE_SCALES: Array[float] = [0.1, 0.3, 1.0, 3.0, 10.0]
+## Valor que el bot atribuye a los nodos del árbol sin efecto directo en $/s
+## (fracción del valor del imperio por rango).
+## Cada cuántos segundos de juego reevalúa el bot el árbol cuando no está ahorrando.
+const TREE_CHECK := 60.0
+const TREE_UTILITY := {"franchising": 0.05, "real_estate": 0.03, "heritage": 0.1}
+## Variantes de producción con el juego cerrado: eficiencia y horas reconocidas.
+const OFFLINE_VARIANTS := [
+	{"name": "Sin offline", "offline_eff": 0.0, "offline_cap": 0.0},
+	{"name": "25 %, 4 h", "offline_eff": 0.25, "offline_cap": 4.0 * 3600.0},
+	{"name": "25 %, 8 h", "offline_eff": 0.25, "offline_cap": 8.0 * 3600.0},
+	{"name": "50 %, 8 h (actual)", "offline_eff": 0.5, "offline_cap": 8.0 * 3600.0},
+	{"name": "100 %, 8 h", "offline_eff": 1.0, "offline_cap": 8.0 * 3600.0},
+	{"name": "100 %, sin límite", "offline_eff": 1.0, "offline_cap": 1e9},
+]
 ## Fórmula recomendada por la suite de prestigio (sección 22).
 const CUBE_10M := {"prest_div": 1e7, "prest_root": 3.0, "rep_model": "linear", "rep_bonus": 0.01}
 const COIN_VARIANTS := [
@@ -56,6 +73,8 @@ const PROFILES := {
 		"desc": "widget abierto; mira 1 min cada 30 min y hace 2 clics/s mientras mira"},
 	"Sesiones": {"cps": 2.0, "every": 43200.0, "len": 3600.0, "closed": true,
 		"desc": "dos sesiones de 1 h al día; cierra el juego entre sesiones"},
+	"Sesiones+widget": {"cps": 2.0, "every": 43200.0, "len": 3600.0, "closed": false,
+		"desc": "mismas sesiones, pero deja el juego abierto como widget entre ellas"},
 }
 
 var base_cost: Array[float] = []
@@ -79,6 +98,11 @@ var coin_progress := 0.0
 var focus := 0
 var present := false
 var m: Dictionary
+## Árbol del imperio: rangos comprados y coste del rango para el que se ahorra (-1: ninguno).
+var tree_nodes: Array[Dictionary] = []
+var tree := {}
+var tree_goal := -1.0
+var tree_check_at := 0.0
 
 
 func _initialize() -> void:
@@ -94,6 +118,7 @@ func _main() -> void:
 		names.append(b.title)
 	scene.free()
 	rep_upgrades = GameData.reputation_upgrades()
+	tree_nodes = GameData.empire_tree()
 	for link in range(1, Game.CHAIN_MAX + 1):
 		var chance := pow(Game.CHAIN_CONTINUE_CHANCE, link - 1)
 		chain_seconds += 15.0 * link * chance
@@ -104,9 +129,25 @@ func _main() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--probe="):
 			var parts := arg.trim_prefix("--probe=").split(",")
-			var r := run(_params(parts[0], {"renew": "renew" in parts, "found_save": 600.0 if "found" in parts else 0.0}))
+			var overrides := {"renew": "renew" in parts, "found_save": 600.0 if "found" in parts else 0.0}
+			for part in parts:
+				if part.begins_with("lb="):
+					overrides.level_base = part.trim_prefix("lb=").to_float()
+				elif part.begins_with("lg="):
+					overrides.level_growth = part.trim_prefix("lg=").to_float()
+				elif part.begins_with("ts="):
+					overrides.tree_scale = part.trim_prefix("ts=").to_float()
+				elif part.begins_with("off="):
+					overrides.tree_off = part.trim_prefix("off=").split("+")
+				elif part == "notree":
+					overrides.tree = false
+			var r := run(_params(parts[0], overrides))
 			print("%s: %.1f s, pasos %d, ciudades %d, rep %d, ganado %s, compras %s" % [arg, (Time.get_ticks_msec() - started) / 1000.0,
 					r.steps, cities.size(), r.rep, _m(r.earned), _purchases(r)])
+			for s in r.snap.size():
+				print("  %s: niveles (mejor ciudad) %d, árbol %d/%d, $/s %s" % [_t(SNAPSHOTS[s]), r.snap[s].levels,
+						r.snap[s].tree, _tree_total(), _m(r.snap[s].ips)])
+			print("  árbol: primera compra %s, completo %s, orden %s" % [_t(r.t_tree_first), _t(r.t_tree_full), ", ".join(r.tree_order)])
 			quit()
 			return
 	# -- --suite=prestige: compara fórmulas de prestigio y monedas alternativas.
@@ -120,6 +161,9 @@ func _main() -> void:
 	elif "--suite=empire" in args:
 		path = EMPIRE_OUT_PATH
 		report = _empire_report()
+	elif "--suite=tree" in args:
+		path = TREE_OUT_PATH
+		report = _tree_report()
 	else:
 		report = _report()
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -141,7 +185,14 @@ func _params(profile: String, overrides := {}) -> Dictionary:
 		# Monedas: bonus permanente por moneda y si Click Frenzy escala con Golden Touch.
 		"coin_bonus": Game.GOLDEN_BONUS_PER_COIN, "frenzy_boost": false, "coin_cap": Game.GOLDEN_BONUS_CAP,
 		# Ámbito de la Reputación: "city" (raíz por ciudad) o "empire" (raíz del imperio repartida).
-		"rep_scope": "empire"}
+		"rep_scope": "empire",
+		# Niveles de edificio: coste = base × level_base × level_growth^nivel.
+		"level_base": ShopButton.LEVEL_COST_BASE, "level_growth": ShopButton.LEVEL_COST_GROWTH,
+		# Árbol del imperio: se ahorra para el mejor rango cuando su puntuación es menor que
+		# tree_patience × la de la mejor compra de las ciudades; costes × tree_scale.
+		"tree": true, "tree_patience": 1.0, "tree_scale": 1.0, "tree_off": [],
+		# Producción con el juego cerrado.
+		"offline_eff": Game.OFFLINE_EFFICIENCY, "offline_cap": Game.OFFLINE_MAX_SECONDS}
 	params.merge(overrides, true)
 	return params
 
@@ -323,6 +374,80 @@ func _empire_report() -> String:
 	return "\n".join(out)
 
 
+func _tree_report() -> String:
+	var out: PackedStringArray = []
+	out.append("# Simulación del árbol del imperio y de la producción offline — MoneyClicker\n")
+	out.append("Generado por `tools/balance_sim.gd -- --suite=tree` el %s. Mismos bots que [SIMULACION_BALANCE.md](SIMULACION_BALANCE.md), renovando y fundando (ahorro si cabe en 10 min), horizonte de 72 h.\n" % Time.get_date_string_from_system())
+	out.append("- El bot compara cada rango del árbol con las compras de las ciudades usando la misma puntuación (`espera + coste / aumento de $/s`, con el aumento medido en todo el imperio, incluidos clics y monedas); ahorra para el árbol cuando su mejor rango puntúa mejor que la mejor compra de cualquier ciudad. Franchising, Real Estate y Heritage, que no suben los $/s directamente, cuentan como +5 %, +3 % y +10 % por rango. Mientras ahorra, ninguna ciudad compra otra cosa. Paga con el dinero de todas las ciudades, en proporción a lo que tiene cada una.")
+	out.append("- El árbol tiene %d rangos en %d nodos. «Escala» multiplica todos los costes de `GameData.empire_tree()` (1 = valores del juego)." % [_tree_total(), tree_nodes.size()])
+	out.append("- «Ganado vs sin árbol» compara el dinero total de 72 h con el mismo perfil sin árbol.\n")
+
+	out.append("## 1. Escala de costes\n")
+	out.append("| Escala | Perfil | 1.ª compra | Rangos 1 h | 4 h | 24 h | 72 h | Árbol completo | Gastado en el árbol | Ganado vs sin árbol |")
+	out.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+	var profiles := ["Activo", "Espaciado", "Sesiones"]
+	var without := {}
+	for name in profiles:
+		without[name] = run(_params(name, {"renew": true, "found_save": 600.0, "tree": false}))
+	for scale in TREE_SCALES:
+		for name in profiles:
+			var r := run(_params(name, {"renew": true, "found_save": 600.0, "tree_scale": scale}))
+			out.append("| %s | %s | %s | %d | %d | %d | %d | %s | %s $ (%s) | %+.0f %% |" % [_ratio(scale), name, _t(r.t_tree_first),
+					r.snap[0].tree, r.snap[1].tree, r.snap[3].tree, r.snap[4].tree, _t(r.t_tree_full),
+					_m(r.tree_spent), _pct(r.tree_spent / r.earned), (r.earned / without[name].earned - 1.0) * 100.0])
+
+	out.append("\n## 2. Ritmo con los costes del juego (escala 1)\n")
+	out.append("Momento en que se compra el primer y el último rango de cada nodo (— = no llega en 72 h).\n")
+	var detail := {}
+	for name in ["Activo", "Espaciado"]:
+		detail[name] = run(_params(name, {"renew": true, "found_save": 600.0}))
+	out.append("| Rama | Nodo | Rangos | Coste del 1.er rango | Activo: primero / último | Espaciado: primero / último |")
+	out.append("|---|---|---:|---:|---:|---:|")
+	for node in tree_nodes:
+		var cells: PackedStringArray = []
+		for name in ["Activo", "Espaciado"]:
+			var first := NEVER
+			var last := NEVER
+			var count := 0
+			for entry: String in detail[name].tree_order:
+				var parts := entry.split("@")
+				if parts[0] == node.id:
+					count += 1
+					if count == 1:
+						first = _parse_time(parts[1])
+					if count == int(node.max):
+						last = _parse_time(parts[1])
+			cells.append("%s / %s" % [_t(first), _t(last)])
+		out.append("| %s | %s | %d | %s $ | %s | %s |" % [node.branch, node.name, node.max, _m(node.cost), cells[0], cells[1]])
+	var slow := run(_params("Activo", {"renew": true, "found_save": 600.0, "tree_patience": 3.0}))
+	out.append("\nSi el bot Activo prioriza el árbol (lo compra aunque puntúe hasta 3 veces peor que la mejor compra de una ciudad): %d rangos a las 24 h, %d a las 72 h, ganado %+.0f %% frente a sin árbol.\n" % [
+			slow.snap[3].tree, slow.snap[4].tree, (slow.earned / without["Activo"].earned - 1.0) * 100.0])
+
+	out.append("## 3. Producción con el juego cerrado\n")
+	out.append("Perfil Sesiones (dos sesiones de 1 h al día) cerrando el juego entre sesiones con distintas reglas offline, frente a dejarlo abierto como widget (100 %, monedas solo durante las sesiones). «Cerrar / widget» = ganado cerrando ÷ ganado con widget.\n")
+	var widget := run(_params("Sesiones+widget", {"renew": true, "found_save": 600.0}))
+	out.append("Widget abierto: ganado 72 h %s $, $/s final %s, %d rangos del árbol.\n" % [_m(widget.earned), _m(widget.snap[4].ips), widget.snap[4].tree])
+	out.append("| Regla offline | Ganado 72 h | Cerrar / widget | Parte offline | $/s 72 h | Rangos del árbol 72 h | Ciudades 72 h |")
+	out.append("|---|---:|---:|---:|---:|---:|---:|")
+	for variant: Dictionary in OFFLINE_VARIANTS:
+		var params := _params("Sesiones", {"renew": true, "found_save": 600.0})
+		params.merge(variant, true)
+		params.erase("name")
+		var r := run(params)
+		out.append("| %s | %s $ | %s | %s | %s | %d | %d |" % [variant.name, _m(r.earned), _pct(r.earned / widget.earned),
+				_pct(r.offline / r.earned), _m(r.snap[4].ips), r.snap[4].tree, r.snap[4].cities])
+	out.append("")
+	return "\n".join(out)
+
+
+func _parse_time(text: String) -> float:
+	if text.ends_with(" h"):
+		return text.trim_suffix(" h").to_float() * H
+	if text.ends_with(" min"):
+		return text.trim_suffix(" min").to_float() * 60.0
+	return text.trim_suffix(" s").to_float()
+
+
 func _scope(scope: String) -> String:
 	return "Imperio" if scope == "empire" else "Ciudad"
 
@@ -343,12 +468,16 @@ func run(params: Dictionary) -> Dictionary:
 	owned = {}
 	coin_progress = 0.0
 	focus = 0
+	tree = {}
+	tree_check_at = 0.0
+	tree_goal = -1.0
 	cities.clear()
 	cities.append(_new_city())
 	m = {"earned": 0.0, "build": 0.0, "click": 0.0, "coin": 0.0, "offline": 0.0,
 		"first": [NEVER, NEVER, NEVER, NEVER, NEVER], "purchases": {}, "building_buys": 0,
 		"latest_buys": 0, "t_second_city": NEVER, "t_first_renew": NEVER, "renewals": 0,
-		"steps": 0, "foundings": [], "found_paybacks": [], "watch": [], "recoveries": [], "snap": [], "rep": 0}
+		"steps": 0, "foundings": [], "found_paybacks": [], "watch": [], "recoveries": [], "snap": [], "rep": 0,
+		"t_tree_first": NEVER, "t_tree_full": NEVER, "tree_order": [], "tree_spent": 0.0}
 	var next_snap := 0
 	while t < HORIZON - 1e-6:
 		present = _is_present(t)
@@ -357,10 +486,16 @@ func run(params: Dictionary) -> Dictionary:
 		var dt := minf(_next_boundary(t), SNAPSHOTS[next_snap]) - t
 		if present:
 			dt = minf(dt, MAX_PRESENT_STEP)
+			var cash := 0.0
+			var total_rate := 0.0
 			for c in cities:
 				var rate := _rate(c)
+				cash += c.dollars
+				total_rate += rate
 				if c.target > c.dollars and rate > 0.0:
 					dt = minf(dt, (c.target - c.dollars) / rate)
+			if tree_goal > cash and total_rate > 0.0:
+				dt = minf(dt, (tree_goal - cash) / total_rate)
 		dt = maxf(dt, MIN_STEP)
 		_advance(dt)
 		m.steps += 1
@@ -370,7 +505,10 @@ func run(params: Dictionary) -> Dictionary:
 			var total_ips := 0.0
 			for c in cities:
 				total_ips += _ips(c.counts, c.upg)
-			m.snap.append({"ips": total_ips, "cities": cities.size()})
+			var best_levels := 0
+			for c in cities:
+				best_levels = maxi(best_levels, Array(c.upg).reduce(func(a, b): return a + b, 0))
+			m.snap.append({"ips": total_ips, "cities": cities.size(), "levels": best_levels, "tree": _tree_bought()})
 			next_snap += 1
 		if next_snap >= SNAPSHOTS.size():
 			break
@@ -403,19 +541,135 @@ func _next_boundary(time: float) -> float:
 	var start := time - phase
 	if phase < prof.len:
 		return start + prof.len
-	if prof.closed and phase < prof.len + Game.OFFLINE_MAX_SECONDS:
-		return start + prof.len + Game.OFFLINE_MAX_SECONDS
+	if prof.closed and phase < prof.len + p.offline_cap:
+		return minf(start + prof.len + p.offline_cap, start + prof.every)
 	return start + prof.every
 
 
 ## Eficiencia de la producción automática ahora mismo (offline del juego si está cerrado).
+## Night Owl suma lo mismo que en el juego (75 % frente a 50 %).
 func _efficiency() -> float:
 	if present or not prof.closed:
 		return 1.0
 	var away: float = fmod(t, prof.every) - prof.len
-	if away >= Game.OFFLINE_MAX_SECONDS:
+	if away >= p.offline_cap or p.offline_eff <= 0.0:
 		return 0.0
-	return Game.OFFLINE_EFFICIENCY_UPGRADED if owned.has("night_owl") else Game.OFFLINE_EFFICIENCY
+	var bonus := Game.OFFLINE_EFFICIENCY_UPGRADED - Game.OFFLINE_EFFICIENCY if owned.has("night_owl") else 0.0
+	return minf(1.0, p.offline_eff + bonus)
+
+
+# --- Árbol del imperio -------------------------------------------------------------
+
+func _tr(id: String) -> int:
+	return tree.get(id, 0)
+
+
+## Efecto acumulado de un nodo (per × rango).
+func _tree_effect(id: String) -> float:
+	for node in tree_nodes:
+		if node.id == id:
+			return float(node.per) * _tr(id)
+	return 0.0
+
+
+func _tree_bought() -> int:
+	var total := 0
+	for id in tree:
+		total += tree[id]
+	return total
+
+
+func _tree_total() -> int:
+	var total := 0
+	for node in tree_nodes:
+		total += int(node.max)
+	return total
+
+
+## $/s esperados del imperio con el jugador presente: edificios, clics y monedas de la ciudad mirada.
+func _empire_value() -> float:
+	var total := 0.0
+	for c in cities:
+		total += _value(c.counts, c.upg, c.ink, c.boost, _clicking(c))
+	if p.coins:
+		total += _coins_per_second() * _coin_ev(cities[focus])
+	return total
+
+
+## Rango del árbol con mejor `espera + coste / aumento de $/s`, comparable con las compras de
+## las ciudades. Los nodos sin efecto directo en $/s cuentan como TREE_UTILITY × valor del imperio.
+func _best_tree_rank(cash: float, empire_rate: float) -> Dictionary:
+	var best := {}
+	var before := _empire_value()
+	for node in tree_nodes:
+		var rank := _tr(node.id)
+		if rank >= int(node.max) or (node.requires != "" and _tr(node.requires) < 1) or node.id in p.tree_off:
+			continue
+		var cost := GameData.tree_cost(node, rank, p.tree_scale)
+		var gain := 0.0
+		if TREE_UTILITY.has(node.id):
+			gain = before * TREE_UTILITY[node.id]
+		else:
+			tree[node.id] = rank + 1
+			gain = _empire_value() - before
+			tree[node.id] = rank
+		if gain <= 0.0:
+			continue
+		var wait := maxf(0.0, cost - cash) / empire_rate if empire_rate > 0.0 else INF
+		var score := wait + cost / gain
+		if best.is_empty() or score < best.score:
+			best = {"id": node.id, "cost": cost, "score": score}
+	return best
+
+
+## Paga con el dinero de todas las ciudades, en proporción a lo que tiene cada una (como el juego).
+## El bot ahorra para el árbol solo si su mejor rango rinde más que la mejor compra de cualquier ciudad.
+func _consider_tree() -> bool:
+	if not p.tree:
+		return false
+	# Mientras ahorra solo comprueba si ya llega; si no, reevalúa como mucho cada TREE_CHECK s.
+	if tree_goal > 0.0:
+		var saved := 0.0
+		for c in cities:
+			saved += c.dollars
+		if saved < tree_goal:
+			return false
+	elif t < tree_check_at:
+		return false
+	tree_goal = -1.0
+	tree_check_at = t + TREE_CHECK
+	var bought := false
+	for guard in 100:
+		var cash := 0.0
+		var empire_rate := 0.0
+		for c in cities:
+			cash += c.dollars
+			empire_rate += _rate(c)
+		var next := _best_tree_rank(cash, empire_rate)
+		if next.is_empty():
+			return bought
+		var city_score := INF
+		for c in cities:
+			var option := _best_purchase(c)
+			if not option.is_empty():
+				city_score = minf(city_score, option.score)
+		if next.score > city_score * p.tree_patience:
+			return bought
+		if cash < next.cost:
+			tree_goal = next.cost
+			return bought
+		var fraction: float = next.cost / cash
+		for c in cities:
+			c.dollars -= c.dollars * fraction
+		tree[next.id] = _tr(next.id) + 1
+		m.tree_spent += next.cost
+		m.tree_order.append("%s@%s" % [next.id, _t(t)])
+		if m.t_tree_first == NEVER:
+			m.t_tree_first = t
+		if _tree_bought() == _tree_total():
+			m.t_tree_full = t
+		bought = true
+	return bought
 
 
 # --- Economía (misma fórmula que game.gd) -----------------------------------------
@@ -438,11 +692,15 @@ func _next_milestone(amount: int) -> int:
 
 
 func _mult() -> float:
-	var rep_factor: float = 1.0 + p.rep_bonus * (sqrt(float(rep)) if p.rep_model == "sqrt" else float(rep))
+	var rep_bonus: float = p.rep_bonus + _tree_effect("empire_hq")
+	var rep_factor: float = 1.0 + rep_bonus * (sqrt(float(rep)) if p.rep_model == "sqrt" else float(rep))
 	var coin_factor: float = p.coin_bonus * golden
 	if p.coin_cap >= 0.0:
-		coin_factor = minf(coin_factor, p.coin_cap)
-	return (1.0 + coin_factor) * rep_factor
+		coin_factor = minf(coin_factor, p.coin_cap + _tree_effect("golden_vault"))
+	var tree_factor := (1.0 + _tree_effect("trade_network")) * (1.0 + _tree_effect("global_brand"))
+	if present or not prof.closed:
+		tree_factor *= 1.0 + _tree_effect("open_all_night")
+	return (1.0 + coin_factor) * rep_factor * tree_factor
 
 
 func _reputation_for(earned: float) -> int:
@@ -451,20 +709,22 @@ func _reputation_for(earned: float) -> int:
 
 func _ips(counts: PackedInt32Array, upg: PackedInt32Array) -> float:
 	var total := 0.0
+	var synergy_boost := 1.0 + _tree_effect("supply_chains")
 	for i in counts.size():
 		if counts[i] == 0:
 			continue
 		var syn := 1.0
 		if i + 1 < counts.size():
-			syn += synergy[i] * counts[i + 1]
+			syn += synergy[i] * counts[i + 1] * synergy_boost
 		total += base_income[i] * counts[i] * pow(2.0, _milestone_level(counts[i]) + upg[i]) * syn
 	return total * _mult()
 
 
 func _click_rate(ink: int, boost: int, ips: float) -> float:
 	var cps: float = prof.cps
-	var combo := GameData.COMBO_MAX if cps >= 1.0 / Game.COMBO_WINDOW else 1.0
-	return cps * combo * (pow(2.0, ink) * _mult() + ips * Game.BOOST_PER_LEVEL * boost)
+	var combo := GameData.COMBO_MAX + _tree_effect("ergonomics") if cps >= 1.0 / Game.COMBO_WINDOW else 1.0
+	var press := pow(2.0, _tr("printing_press"))
+	return cps * combo * (pow(2.0, ink) * press * _mult() + ips * Game.BOOST_PER_LEVEL * boost)
 
 
 func _clicking(c: Dictionary) -> bool:
@@ -492,30 +752,41 @@ func _advance(dt: float) -> void:
 	var eff := _efficiency()
 	for c in cities:
 		var ips := _ips(c.counts, c.upg)
-		_earn(c, ips * eff * dt, "build" if eff >= 1.0 else "offline")
+		_earn(c, ips * eff * dt, "offline" if prof.closed and not present else "build")
 		if _clicking(c):
 			_earn(c, _click_rate(c.ink, c.boost, ips) * dt, "click")
 	if present and p.coins:
-		var interval := (Game.GOLDEN_DELAY.x + Game.GOLDEN_DELAY.y) / 2.0
-		if owned.has("lucky_charm"):
-			interval *= 0.7
-		coin_progress += dt / interval
+		coin_progress += dt * _coins_per_second()
 		while coin_progress >= 1.0:
 			coin_progress -= 1.0
 			_collect_coin(cities[focus])
 
 
-## Valor esperado de una moneda especial en la ciudad que se está mirando.
+## Monedas especiales por segundo con el jugador presente (Lucky Press: cada clic puede soltar una).
+func _coins_per_second() -> float:
+	var interval := (Game.GOLDEN_DELAY.x + Game.GOLDEN_DELAY.y) / 2.0
+	if owned.has("lucky_charm"):
+		interval *= 0.7
+	interval /= 1.0 + _tree_effect("lucky_streets")
+	return 1.0 / interval + prof.cps * _tree_effect("lucky_press")
+
+
 func _collect_coin(c: Dictionary) -> void:
-	var stretch := 1.5 if owned.has("golden_age") else 1.0
-	var ips := _ips(c.counts, c.upg)
-	var clicks := _click_rate(c.ink, c.boost if p.frenzy_boost else 0, ips) if prof.cps > 0.0 else 0.0
-	var gold := ips * (0.4 * Game.LUCKY_SECONDS + 0.35 * (Game.FRENZY_MULTIPLIER - 1.0) * Game.FRENZY_TIME * stretch
-			+ 0.1 * chain_seconds) + 0.15 * clicks * (Game.CLICK_FRENZY_MULTIPLIER - 1.0) * Game.CLICK_FRENZY_TIME * stretch
-	var red := 0.5 * ips * Game.RED_JACKPOT_SECONDS
-	_earn(c, (1.0 - Game.RED_CHANCE) * gold + Game.RED_CHANCE * red, "coin")
+	_earn(c, _coin_ev(c), "coin")
 	c.dollars -= Game.RED_CHANCE * 0.5 * Game.RED_LOSS * c.dollars
 	golden += (1.0 - Game.RED_CHANCE) * (0.9 + 0.1 * chain_links)
+
+
+## Valor esperado de una moneda especial en la ciudad c.
+func _coin_ev(c: Dictionary) -> float:
+	var stretch := (1.5 if owned.has("golden_age") else 1.0) * (1.0 + _tree_effect("long_party"))
+	var ips := _ips(c.counts, c.upg)
+	var clicks := _click_rate(c.ink, c.boost if p.frenzy_boost else 0, ips) if prof.cps > 0.0 else 0.0
+	var midas := _tree_effect("midas_odds")
+	var gold := ips * ((0.4 - midas) * Game.LUCKY_SECONDS + (0.35 + midas) * (Game.FRENZY_MULTIPLIER - 1.0) * Game.FRENZY_TIME * stretch
+			+ 0.1 * chain_seconds) + 0.15 * clicks * (Game.CLICK_FRENZY_MULTIPLIER - 1.0) * Game.CLICK_FRENZY_TIME * stretch
+	var red := 0.5 * ips * Game.RED_JACKPOT_SECONDS
+	return (1.0 - Game.RED_CHANCE) * gold + Game.RED_CHANCE * red
 
 
 # --- Decisiones del jugador --------------------------------------------------------
@@ -527,10 +798,13 @@ func _decide() -> void:
 	_choose_focus()
 	_consider_renewal()
 	_consider_founding()
+	var bought_tree := _consider_tree()
 	# Solo se recalcula la mejor compra cuando cambia el contexto o ya se puede pagar el objetivo.
-	var dirty := focus != previous_focus or rep != previous_rep or cities.size() != previous_cities
+	var dirty := focus != previous_focus or rep != previous_rep or cities.size() != previous_cities or bought_tree
 	for c in cities:
-		if c.saving:
+		if tree_goal > 0.0:
+			c.target = -1.0  # todas las ciudades ahorran para el árbol
+		elif c.saving:
 			c.target = _found_cost()
 		elif dirty or c.target < 0.0 or c.dollars >= c.target:
 			_shop(c)
@@ -579,11 +853,12 @@ func _best_purchase(c: Dictionary) -> Dictionary:
 			var cost := first * (pow(ShopButton.COST_GROWTH, quantity) - 1.0) / (ShopButton.COST_GROWTH - 1.0)
 			options.append({"kind": "building", "index": i, "qty": quantity, "cost": cost,
 				"after": _value(counts, c.upg, c.ink, c.boost, clicking)})
-		if c.upg[i] < ShopButton.UPGRADE_THRESHOLDS.size() and c.counts[i] >= ShopButton.UPGRADE_THRESHOLDS[c.upg[i]]:
+		if c.upg[i] < ShopButton.MAX_LEVEL and c.counts[i] >= ShopButton.LEVEL_REQUIREMENTS[c.upg[i]]:
 			var upg: PackedInt32Array = c.upg.duplicate()
 			upg[i] += 1
-			options.append({"kind": "upgrade", "index": i, "cost": base_cost[i] * ShopButton.UPGRADE_COST_FACTORS[c.upg[i]],
+			options.append({"kind": "upgrade", "index": i, "cost": base_cost[i] * p.level_base * pow(p.level_growth, c.upg[i]),
 				"after": _value(c.counts, upg, c.ink, c.boost, clicking)})
+			options[-1].cost *= 1.0 - _tree_effect("franchising")
 	if clicking:
 		options.append({"kind": "ink", "cost": Game.INK_BASE_COST * pow(Game.INK_GROWTH, c.ink),
 			"after": _value(c.counts, c.upg, c.ink + 1, c.boost, true)})
@@ -600,6 +875,7 @@ func _best_purchase(c: Dictionary) -> Dictionary:
 		if score < best_score:
 			best_score = score
 			best = option
+			best.score = score
 	return best
 
 
@@ -633,7 +909,7 @@ func _buy(c: Dictionary, option: Dictionary) -> void:
 
 
 func _found_cost() -> float:
-	return roundf(p.found_base * pow(p.found_growth, cities.size() - 1))
+	return roundf(p.found_base * pow(p.found_growth, cities.size() - 1) * (1.0 - _tree_effect("real_estate")))
 
 
 func _consider_founding() -> void:
@@ -696,7 +972,10 @@ func _consider_renewal() -> void:
 	best.claimed += best_pending
 	best.claimed_life = best.lifetime
 	best.counts = PackedInt32Array([0, 0, 0, 0, 0])
-	best.upg = PackedInt32Array([0, 0, 0, 0, 0])
+	# Heritage conserva hasta `rango` niveles de cada edificio.
+	var keep := _tr("heritage")
+	for i in best.upg.size():
+		best.upg[i] = mini(best.upg[i], keep)
 	best.ink = 0
 	best.boost = 0
 	best.total = 0.0

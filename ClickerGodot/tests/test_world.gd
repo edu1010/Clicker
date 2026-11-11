@@ -99,8 +99,67 @@ func _run() -> void:
 	check(bar.count == 3 and is_equal_approx(game.dollars, 60.0 - 52.0875), "Buy max spends the right amount")
 	game.buy_mode = 0
 	bar.count = 0
+	# Niveles de edificio: requisito de cantidad, coste creciente y "subir todo" sin compras parciales.
+	var factory: ShopButton = game.buttons[1]
+	game.total_earned = 1e6
+	bar.count = 1
+	check(is_equal_approx(bar.next_level_cost(), 15.0 * ShopButton.LEVEL_COST_BASE), "First level cost")
+	game.dollars = bar.next_level_cost() - 1.0
+	check(not game.level_up(0), "Level up needs enough money")
+	game.dollars = bar.next_level_cost()
+	check(game.level_up(0) and bar.level == 1 and game.dollars == 0.0, "Level up charges exactly its cost")
+	check(not bar.level_ready() and bar.next_level_requirement() == 10, "Next level needs more buildings")
+	bar.count = 10
+	factory.count = 1
+	var all_cost := bar.next_level_cost() + factory.next_level_cost()
+	check(game.levels_ready() == [0, 1] and is_equal_approx(game.level_all_cost(), all_cost), "Level-all cost sums every ready building")
+	game.dollars = all_cost - 1.0
+	check(not game.level_up_all() and bar.level == 1 and factory.level == 0, "Level-all never buys partially")
+	game.dollars = all_cost
+	check(game.level_up_all() and bar.level == 2 and factory.level == 1 and is_equal_approx(game.dollars, 0.0), "Level-all levels every ready building")
+	check(is_equal_approx(bar.income(1.0), 1.5 * 10 * pow(2.0, 1 + 2)), "Each level doubles income")
+	bar.level = ShopButton.MAX_LEVEL
+	check(bar.is_max_level() and not bar.level_ready(), "Level 10 is the maximum")
+	bar.level = 0
+	bar.count = 0
+	factory.count = 0
 	game.dollars = 0.0
 	game.total_earned = 0.0
+	# Árbol del imperio: se paga con el dinero de todas las ciudades, en proporción a lo que tiene cada una.
+	var other: int = 1 - game.active_city
+	var other_cash: float = game.city_states[other].dollars
+	game.dollars = 3e5
+	game.city_states[other].dollars = 7e5
+	check(is_equal_approx(game.empire_cash(), 1e6), "Treasury adds the cash of every city")
+	check(game.tree_cost("trade_network") == 1e6, "First empire tree rank costs 1M")
+	check(not game.can_buy_tree("supply_chains"), "Tree nodes need the previous node")
+	var mult_before: float = game.permanent_multiplier()
+	check(game.buy_tree("trade_network"), "Tree rank bought with pooled money")
+	check(is_zero_approx(game.dollars) and is_zero_approx(game.city_states[other].dollars), "Every city pays its share")
+	check(is_equal_approx(game.permanent_multiplier(), mult_before * 1.04), "Trade Network raises income")
+	game.dollars = 12e6
+	game.city_states[other].dollars = 4e6
+	check(game.buy_tree("trade_network") and is_equal_approx(game.dollars, 6e6) and is_equal_approx(game.city_states[other].dollars, 2e6),
+			"Cities pay in proportion to their cash")
+	check(not game.buy_tree("supply_chains"), "Tree purchase needs enough money in the empire")
+	game.empire_tree["open_all_night"] = 1
+	check(is_equal_approx(game.permanent_multiplier(true) / game.permanent_multiplier(false), 1.1), "Open All Night only counts while the game is open")
+	game.empire_tree["franchising"] = 2
+	game.empire_tree["real_estate"] = 1
+	game._apply_tree()
+	bar.count = 1
+	check(is_equal_approx(bar.next_level_cost(), 15.0 * ShopButton.LEVEL_COST_BASE * 0.8), "Franchising discounts levels")
+	check(game.found_cost() == 1700000.0, "Real Estate discounts founding")
+	bar.level = 3
+	game._reset_city(1)
+	check(bar.level == 1 and bar.count == 0, "Heritage keeps levels when renewing")
+	bar.level = 0
+	game.empire_tree.erase("open_all_night")
+	game.empire_tree.erase("franchising")
+	game.empire_tree.erase("real_estate")
+	game._apply_tree()
+	game.dollars = 0.0
+	game.city_states[other].dollars = other_cash
 	game.save_game()
 	var cfg := ConfigFile.new()
 	check(cfg.load(game.save_path) == OK, "Save succeeds")
@@ -110,10 +169,13 @@ func _run() -> void:
 	game.active_city = 0
 	game.load_game()
 	check(game.city_states.size() == 2 and game.active_city == 1, "Save reload preserves cities and selection")
+	check(game.buttons[1].level == 1, "Save reload preserves building levels")
 	game.change_city(-1)
 	check(game.buttons[0].count == 2 and game.ink_level == 2, "Save reload preserves independent economy")
 	check(game.city_states[1].claimed_life == 8e7 and game.city_states[1].lifetime == 8e7, "Save reload preserves reputation tracks")
 	check(game.found_cost() == 2000000.0, "Save reload preserves founding price")
+	check(game.tree_rank("trade_network") == 2 and is_equal_approx(ShopButton.level_discount, 1.0), "Save reload preserves the empire tree")
+	game.empire_tree.clear()
 	# La producción sin conexión incluye la reputación compartida y se reparte al 50 %.
 	game.city_states[1].buildings[0].count = 1
 	game.save_game()
@@ -149,7 +211,7 @@ func _run() -> void:
 	v3.set_value("progress", "lifetime_earned", 4e6)
 	v3.set_value("progress", "cities", 2)
 	v3.set_value("world", "active_city", 0)
-	v3.set_value("world", "cities", [{"dollars": 10.0, "total_earned": 1e6, "buildings": []},
+	v3.set_value("world", "cities", [{"dollars": 10.0, "total_earned": 1e6, "buildings": [{"count": 3, "upgrades": 2}]},
 			{"dollars": 20.0, "total_earned": 2e6, "buildings": []}])
 	v3.save("user://widget_v3_test.cfg")
 	var old_world: Node = load("res://scenes/main.tscn").instantiate()
@@ -160,6 +222,7 @@ func _run() -> void:
 	check(old_world.city_lifetime == 2e6 and old_world.city_claimed_life == 2e6, "v3 migration assigns unattributed earnings without debt")
 	check(old_world.city_states[1].claimed_life == 2e6 and old_world.prestige_points == 5, "v3 migration keeps points and marks old earnings as claimed")
 	check(old_world.pending_reputation() == 0, "v3 migration grants no free reputation in the active city")
+	check(old_world.buttons[0].level == 2, "Old building upgrades become levels")
 	old_world.change_city(1)
 	check(old_world.pending_reputation() == 0 and old_world.dollars == 20.0, "v3 migration grants no free reputation in other cities")
 	old_world.use_save = false
