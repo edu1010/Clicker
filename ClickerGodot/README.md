@@ -35,7 +35,8 @@ Sin límite; cada compra encarece el siguiente un 15 %. Cada tipo paga a su ritm
 
 ### Monedas especiales (cada 30–75 s, duran 10 s)
 - **Dorada:** premio de 60 s de producción, frenesí x7 (30 s), clic loco x777 (10 s)
-  o una **cadena** de monedas seguidas. Cada dorada da +2 % de ingresos permanente.
+  o una **cadena** de monedas seguidas. Cada dorada da +2 % de ingresos permanente, hasta un
+  máximo de +50 % (25 monedas). El clic loco multiplica el clic base, no la parte de Golden Touch.
 - **Roja (maldita):** 50 % premio de 10 min de producción, 50 % pierdes el 10 % del dinero.
 
 ### Eventos
@@ -44,9 +45,10 @@ festival, inversor, turistas, apagón).
 
 ### Prestigio
 **Menú → Reputation → Renew City N.** Reinicias solo la ciudad seleccionada (dinero, edificios
-y mejoras) a cambio de **Reputación**. Cada ciudad tiene su propio contador:
-√(lo que ha ganado esa ciudad desde su fundación / 100.000) menos lo que ya reclamó.
-Así una ciudad vacía no puede cobrar la reputación que generan las demás.
+y mejoras) a cambio de **Reputación**. La reputación del imperio es
+∛(lo ganado por todas tus ciudades / 10.000.000); al renovar una ciudad cobras la parte pendiente
+proporcional a lo que esa ciudad ha ganado desde su última renovación.
+Así una ciudad vacía no puede cobrar lo que generan las demás, y fundar no crea reputación extra.
 El botón indica también el aumento real de producción (de 100 a 110 puntos es +5 %, no +10 %).
 Cada punto da +1 % de ingresos para siempre y se gasta en mejoras permanentes:
 Head Start, Seed Money, Lucky Charm, Night Owl y Golden Age.
@@ -72,8 +74,8 @@ cielo con nubes en las calles que superan los 25 edificios.
 
 ### Varias ciudades
 - **+** abre la ficha para **fundar** una ciudad independiente sin borrar las anteriores.
-  Cuesta dinero de la ciudad seleccionada: 250K $ la segunda, 1,25M $ la tercera, 6,25M $ la cuarta…
-  (×5 por cada ciudad existente; valores de prototipo pendientes de balance). La ficha muestra coste,
+  Cuesta dinero de la ciudad seleccionada: 250K $ la segunda, 2M $ la tercera, 16M $ la cuarta…
+  (×8 por cada ciudad existente, elegido por simulación). La ficha muestra coste,
   saldo resultante y precio de la siguiente; solo su botón cobra. El **+** se ilumina cuando puedes pagarla.
 - Fundar (comprar una ciudad) y renovar (prestigio) son acciones distintas.
 - **‹ / ›** cambia de ciudad y vuelve al principio/final al llegar al extremo.
@@ -83,8 +85,9 @@ cielo con nubes en las calles que superan los 25 edificios.
 - El prestigio reinicia solo la ciudad seleccionada; no afecta a las otras ciudades.
 - Los eventos con una decisión pendiente deben resolverse antes de cambiar de ciudad.
 - Las partidas anteriores se convierten automáticamente en la primera ciudad.
-  Las ciudades ya creadas se conservan sin deudas; la reputación ya cobrada en partidas antiguas
-  se reparte entre ciudades para que no pueda reclamarse dos veces.
+  Las ciudades ya creadas y la reputación conseguida se conservan sin deudas. Lo ganado antes del
+  cambio de fórmula cuenta como ya cobrado, así que una partida antigua con mucha reputación tardará
+  en conseguir puntos nuevos.
 
 ### Opciones (Menú → Options)
 Efectos visuales, formato de números (1.23M / 1.23e6), volumen general/música/efectos

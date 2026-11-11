@@ -18,23 +18,27 @@ const PRESTIGE_OUT_PATH := "res://docs/SIMULACION_PRESTIGIO.md"
 
 ## Alternativas de prestigio (sección 21.2 de la investigación).
 const PRESTIGE_OPTIONS := [
-	{"name": "Actual: √(ganado/100K), +1 %/punto", "prest_div": 1e5, "prest_root": 2.0, "rep_model": "linear", "rep_bonus": 0.01},
-	{"name": "√(ganado/10M), +1 %/punto", "prest_div": 1e7, "prest_root": 2.0, "rep_model": "linear", "rep_bonus": 0.01},
-	{"name": "√(ganado/1B), +1 %/punto", "prest_div": 1e9, "prest_root": 2.0, "rep_model": "linear", "rep_bonus": 0.01},
-	{"name": "∛(ganado/100K), +1 %/punto", "prest_div": 1e5, "prest_root": 3.0, "rep_model": "linear", "rep_bonus": 0.01},
-	{"name": "∛(ganado/10M), +1 %/punto", "prest_div": 1e7, "prest_root": 3.0, "rep_model": "linear", "rep_bonus": 0.01},
+	{"name": "Original: √(ganado/100K), +1 %/punto", "prest_div": 1e5, "prest_root": 2.0, "rep_model": "linear", "rep_bonus": 0.01, "rep_scope": "city"},
+	{"name": "√(ganado/10M), +1 %/punto", "prest_div": 1e7, "prest_root": 2.0, "rep_model": "linear", "rep_bonus": 0.01, "rep_scope": "city"},
+	{"name": "√(ganado/1B), +1 %/punto", "prest_div": 1e9, "prest_root": 2.0, "rep_model": "linear", "rep_bonus": 0.01, "rep_scope": "city"},
+	{"name": "∛(ganado/100K), +1 %/punto", "prest_div": 1e5, "prest_root": 3.0, "rep_model": "linear", "rep_bonus": 0.01, "rep_scope": "city"},
+	{"name": "∛(ganado/10M), +1 %/punto", "prest_div": 1e7, "prest_root": 3.0, "rep_model": "linear", "rep_bonus": 0.01, "rep_scope": "city"},
 	{"name": "√(ganado/100K), +10 %·√reputación", "prest_div": 1e5, "prest_root": 2.0, "rep_model": "sqrt", "rep_bonus": 0.1},
 ]
 ## Monedas corregidas: +0,5 % permanente por moneda y Click Frenzy sin Golden Touch.
-const COIN_FIX := {"coin_bonus": 0.005, "frenzy_boost": false}
+const COIN_FIX := {"coin_bonus": 0.005, "frenzy_boost": false, "coin_cap": -1.0}
+## Monedas del juego antes de la sección 23: +2 % sin tope y Click Frenzy con Golden Touch.
+const OLD_COINS := {"coin_bonus": 0.02, "frenzy_boost": true, "coin_cap": -1.0}
+## Las suites comparativas se ejecutaron con el factor de fundación anterior (×5).
+const SUITE_FOUND_GROWTH := 5.0
 
 const EMPIRE_OUT_PATH := "res://docs/SIMULACION_IMPERIO.md"
 ## Fórmula recomendada por la suite de prestigio (sección 22).
 const CUBE_10M := {"prest_div": 1e7, "prest_root": 3.0, "rep_model": "linear", "rep_bonus": 0.01}
 const COIN_VARIANTS := [
-	{"name": "+0,5 %/moneda sin tope", "coin_bonus": 0.005, "frenzy_boost": false},
+	{"name": "+0,5 %/moneda sin tope", "coin_bonus": 0.005, "frenzy_boost": false, "coin_cap": -1.0},
 	{"name": "+2 %/moneda, tope +50 %", "coin_bonus": 0.02, "coin_cap": 0.5, "frenzy_boost": false},
-	{"name": "sin bonus permanente", "coin_bonus": 0.0, "frenzy_boost": false},
+	{"name": "sin bonus permanente", "coin_bonus": 0.0, "frenzy_boost": false, "coin_cap": -1.0},
 ]
 const H := 3600.0
 const HORIZON := 72.0 * H
@@ -132,12 +136,12 @@ func _params(profile: String, overrides := {}) -> Dictionary:
 	var params := {"profile": profile, "coins": true, "found_base": Game.FOUND_BASE_COST,
 		"found_growth": Game.FOUND_GROWTH, "found_save": 0.0, "renew": false,
 		# Prestigio: reputación = floor((ganado / divisor)^(1/root)); bonus lineal o √reputación.
-		"prest_div": Game.PRESTIGE_DIVISOR, "prest_root": 2.0, "rep_model": "linear",
+		"prest_div": Game.PRESTIGE_DIVISOR, "prest_root": Game.PRESTIGE_ROOT, "rep_model": "linear",
 		"rep_bonus": Game.REPUTATION_BONUS,
 		# Monedas: bonus permanente por moneda y si Click Frenzy escala con Golden Touch.
-		"coin_bonus": Game.GOLDEN_BONUS_PER_COIN, "frenzy_boost": true, "coin_cap": -1.0,
+		"coin_bonus": Game.GOLDEN_BONUS_PER_COIN, "frenzy_boost": false, "coin_cap": Game.GOLDEN_BONUS_CAP,
 		# Ámbito de la Reputación: "city" (raíz por ciudad) o "empire" (raíz del imperio repartida).
-		"rep_scope": "city"}
+		"rep_scope": "empire"}
 	params.merge(overrides, true)
 	return params
 
@@ -195,7 +199,7 @@ func _report() -> String:
 		out.append("")
 
 	# 3. Renovación.
-	out.append("## 3. Renovar (prestigio por ciudad)\n")
+	out.append("## 3. Renovar (prestigio)\n")
 	out.append("Con el precio actual de fundación (%s × %d) y ahorro si cabe en 10 min. «Recuperación» = mediana del tiempo que tarda la ciudad renovada en volver a producir lo que producía antes.\n" % [_m(Game.FOUND_BASE_COST), roundi(Game.FOUND_GROWTH)])
 	out.append("| Perfil | Renovar | 1.ª renovación | Renovaciones | Reputación 72 h | Ciudades 72 h | Ganado 72 h | $/s 72 h | Recuperación |")
 	out.append("|---|---|---:|---:|---:|---:|---:|---:|---:|")
@@ -212,18 +216,18 @@ func _prestige_report() -> String:
 	var out: PackedStringArray = []
 	out.append("# Simulación de alternativas de prestigio — MoneyClicker\n")
 	out.append("Generado por `tools/balance_sim.gd -- --suite=prestige` el %s. Mismos bots y supuestos que [SIMULACION_BALANCE.md](SIMULACION_BALANCE.md): renovar cuando la reputación pendiente duplica la total, fundar con el precio actual (%s × %d) cuando cabe en 10 min de producción, horizonte de 72 h.\n" % [
-			Time.get_date_string_from_system(), _m(Game.FOUND_BASE_COST), roundi(Game.FOUND_GROWTH)])
+			Time.get_date_string_from_system(), _m(Game.FOUND_BASE_COST), roundi(SUITE_FOUND_GROWTH)])
 	out.append("- **Renovar ×:** dinero ganado en 72 h renovando frente a no renovar nunca (ambos fundando).")
 	out.append("- **Fundar:** dinero ganado en 72 h fundando frente a no fundar (ambos renovando).")
 	out.append("- **Recuperación:** mediana del tiempo que tarda una ciudad renovada en volver a producir lo de antes.")
 	out.append("- **Monedas corregidas:** +0,5 % permanente por moneda (en vez de +2 %) y Click Frenzy calculado sin Golden Touch.\n")
 	var ratios: PackedStringArray = []
-	for coin_variant in [{}, COIN_FIX]:
-		var fixed: bool = not coin_variant.is_empty()
-		out.append("## %s\n" % ("Monedas corregidas" if fixed else "Monedas actuales"))
+	for coin_variant in [OLD_COINS, COIN_FIX]:
+		var fixed: bool = coin_variant == COIN_FIX
+		out.append("## %s\n" % ("Monedas corregidas" if fixed else "Monedas originales (+2 % sin tope)"))
 		var no_renew := {}
 		for name in ["Activo", "Espaciado"]:
-			var base := _params(name, {"found_save": 600.0})
+			var base := _params(name, {"found_save": 600.0, "found_growth": SUITE_FOUND_GROWTH})
 			base.merge(coin_variant, true)
 			no_renew[name] = run(base)
 			out.append("Sin renovar, %s: ganado %s $, %d ciudades, $/s final %s." % [name, _m(no_renew[name].earned),
@@ -233,7 +237,7 @@ func _prestige_report() -> String:
 		for option: Dictionary in PRESTIGE_OPTIONS:
 			var earned := {}
 			for name in ["Activo", "Espaciado"]:
-				var params := _params(name, {"renew": true, "found_save": 600.0})
+				var params := _params(name, {"renew": true, "found_save": 600.0, "found_growth": SUITE_FOUND_GROWTH})
 				params.merge(option, true)
 				params.merge(coin_variant, true)
 				var r := run(params)
@@ -244,7 +248,7 @@ func _prestige_report() -> String:
 				out.append("| %s | %s | %s | %d | %s | %s | %s $ | ×%s | %+.0f %% | %d |" % [option.name, name, _t(r.t_first_renew),
 						r.renewals, _t(_median(r.recoveries)), _m(r.rep), _m(r.earned), _ratio(r.earned / no_renew[name].earned),
 						(r.earned / no_found.earned - 1.0) * 100.0, r.snap[4].cities])
-			ratios.append("| %s | %s | ×%s |" % [option.name, "corregidas" if fixed else "actuales", _ratio(earned["Activo"] / earned["Espaciado"])])
+			ratios.append("| %s | %s | ×%s |" % [option.name, "corregidas" if fixed else "originales", _ratio(earned["Activo"] / earned["Espaciado"])])
 		out.append("")
 	out.append("## Ventaja del juego activo\n")
 	out.append("Dinero ganado en 72 h por el perfil Activo dividido entre el del perfil Espaciado (ambos renovando y fundando).\n")
@@ -263,21 +267,21 @@ func _empire_report() -> String:
 	out.append("- **Imperio:** la raíz se calcula sobre lo ganado por todas las ciudades; al renovar una ciudad se cobra la parte pendiente proporcional a lo que ganó desde su última renovación.")
 	out.append("- **Renovar ×:** ganado renovando frente a no renovar (ambos fundando). **Fundar:** ganado fundando frente a no fundar (ambos renovando).\n")
 	out.append("## 1. Ámbito de la Reputación y monedas\n")
-	out.append("Precio de fundación actual (%s × %d), ahorrando cuando cabe en 10 min de producción.\n" % [_m(Game.FOUND_BASE_COST), roundi(Game.FOUND_GROWTH)])
+	out.append("Precio de fundación actual (%s × %d), ahorrando cuando cabe en 10 min de producción.\n" % [_m(Game.FOUND_BASE_COST), roundi(SUITE_FOUND_GROWTH)])
 	out.append("| Ámbito | Monedas | Perfil | 1.ª renovación | Renovaciones | Recuperación | Reputación 72 h | Ganado 72 h | Renovar × | Fundar | Ciudades 72 h |")
 	out.append("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
 	var ratios: PackedStringArray = []
 	for coins: Dictionary in COIN_VARIANTS:
 		var no_renew := {}
 		for name in ["Activo", "Espaciado"]:
-			var base := _params(name, {"found_save": 600.0})
+			var base := _params(name, {"found_save": 600.0, "found_growth": SUITE_FOUND_GROWTH})
 			base.merge(coins, true)
 			base.erase("name")
 			no_renew[name] = run(base)
 		for scope in ["city", "empire"]:
 			var earned := {}
 			for name in ["Activo", "Espaciado"]:
-				var params := _params(name, {"renew": true, "found_save": 600.0, "rep_scope": scope})
+				var params := _params(name, {"renew": true, "found_save": 600.0, "found_growth": SUITE_FOUND_GROWTH, "rep_scope": scope})
 				params.merge(CUBE_10M, true)
 				params.merge(coins, true)
 				params.erase("name")

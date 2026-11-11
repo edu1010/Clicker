@@ -701,3 +701,25 @@ Suite: `tools/balance_sim.gd -- --suite=empire`. Datos completos: [SIMULACION_IM
 | Fundación | Base 250K, factor 8 | ~8 ciudades; menor ventaja de fundar sin eliminarla |
 
 Pendiente: dar contenido a partir del segundo día (especializaciones, sección 8; mejoras de Reputación nuevas), porque la expansión y la reputación se estabilizan pronto. También probar el divisor 10⁶ y repetir la medición con monedas aleatorias y jugadores reales.
+
+## 24. Configuración implementada (10 de noviembre de 2026)
+
+La configuración de la sección 23.2 está en `game.gd` (versión de guardado 5):
+
+| Sistema | Implementación |
+|---|---|
+| Reputación | `reputation_for(ganado) = floor(∛(ganado / 10M))` sobre `empire_lifetime()`, la suma de lo ganado por todas las ciudades |
+| Reparto | Cada ciudad guarda `claimed_life` (su `lifetime` en la última renovación). `pending_reputation()` = pendiente del imperio × lo que esta ciudad ganó desde entonces ÷ lo que ganaron todas desde entonces |
+| Monedas | `golden_bonus()` = `min(2 % × monedas, 50 %)`; el HUD indica «max» al llegar al tope. Click Frenzy multiplica solo el clic base, no la parte de Golden Touch |
+| Fundación | Base 250K, factor 8 (250K, 2M, 16M, 128M…) |
+| Menú | La pestaña Reputation muestra lo ganado por el imperio, el siguiente punto, la reputación sin cobrar y la parte de la ciudad seleccionada |
+
+**Migración:** las partidas v4 o anteriores conservan ciudades y puntos de Reputación, y todo lo ganado hasta ahora se marca como cobrado. No hay deudas ni puntos regalados; a cambio, una partida antigua con mucha reputación de la fórmula anterior tardará en ganar puntos nuevos.
+
+`tools/balance_sim.gd` usa ahora estos valores por defecto. El informe base regenerado ([SIMULACION_BALANCE.md](SIMULACION_BALANCE.md)) muestra:
+
+- Monedas: 61 % del dinero del Activo (antes 91 %) y efecto ×1,5 a las 24 h (antes ×126).
+- Renovar: primera vez a los 4 min (Activo) o 1 h (Espaciado); la ciudad se recupera en 20 min o 1,5 h; 64–128 puntos en 72 h.
+- **Nuevo hallazgo:** sin fundar ni renovar, una ciudad se estanca hacia las 24 h (160M $/s a las 24 h y a las 72 h). Junto con el tope de ~8 ciudades del primer día, confirma que falta contenido a partir del segundo día (sección 23.2).
+
+Las suites `prestige` y `empire` fijan las condiciones con las que se ejecutaron (monedas originales, factor 5) para que se puedan reproducir.
